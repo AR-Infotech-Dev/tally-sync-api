@@ -1,6 +1,9 @@
 {
   "name": "Flowups - Tally Sync API",
   "version": "1.0.0",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "private": true,
   "type": "module",
   "imports": {
