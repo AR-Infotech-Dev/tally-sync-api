@@ -3,6 +3,7 @@ import { SOCKET_EVENTS } from "../../socket/utils/events.js";
 import { connectorRoom } from "../../socket/utils/rooms.js";
 import { findQueuedSalesOrders, markSalesOrderProcessing, updateSalesOrderRequest } from "../sales-order/sales.model.js";
 import { findActiveClient } from "../clients/client.model.js";
+import { recordConsoleLog } from "../console/consoleLog.store.js";
 
 async function emitPendingSalesOrders(clientId, socket) {
   const requests = await findQueuedSalesOrders(clientId);
@@ -12,7 +13,10 @@ async function emitPendingSalesOrders(clientId, socket) {
       action: "sales_order.push",
     });
   }
-  if (requests.length) console.info("Queued sales orders sent to connector:", { clientId, count: requests.length });
+  if (requests.length) {
+    console.info("Queued sales orders sent to connector:", { clientId, count: requests.length });
+    recordConsoleLog("info", "Queued sales order signals dispatched", { source: "socket", clientId, count: requests.length });
+  }
 }
 
 const isValidId = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
@@ -44,17 +48,20 @@ export function registerConnectorSocketHandlers(socket) {
         code: cause.code || cause.codeName || "unknown",
         message: safeMessage,
       });
+      recordConsoleLog("error", "Connector registration lookup failed", { source: "socket", clientId, socketId: socket.id, code: cause.code || "unknown" });
       ack({ success: false, code: "REGISTRATION_UNAVAILABLE", message: "Connector registration is temporarily unavailable." });
       return;
     }
     const connectorKeyHash = client?.connector_key_hash;
     if (!connectorKeyHash || !/^[a-f0-9]{64}$/i.test(connectorKeyHash) || typeof payload.connector_key !== "string") {
+      recordConsoleLog("warn", "Connector registration rejected: invalid client or connector credentials", { source: "socket", clientId, connectorId, socketId: socket.id });
       ack({ success: false, code: "CONNECTOR_UNAUTHORIZED", message: "Invalid connector credentials." });
       return;
     }
     const receivedHash = createHash("sha256").update(payload.connector_key).digest();
     const expectedHash = Buffer.from(connectorKeyHash, "hex");
     if (!timingSafeEqual(receivedHash, expectedHash)) {
+      recordConsoleLog("warn", "Connector registration rejected: key did not match", { source: "socket", clientId, connectorId, socketId: socket.id });
       ack({ success: false, code: "CONNECTOR_UNAUTHORIZED", message: "Invalid connector credentials." });
       return;
     }
@@ -82,8 +89,12 @@ export function registerConnectorSocketHandlers(socket) {
       at: new Date().toISOString(),
     });
     emitPendingSalesOrders(clientId, socket)
-      .catch((error) => console.error("Could not dispatch queued sales orders:", error.message));
+      .catch((error) => {
+        console.error("Could not dispatch queued sales orders:", error.message);
+        recordConsoleLog("error", "Could not dispatch queued sales orders", { source: "socket", clientId, connectorId });
+      });
     console.info("Connector registered:", { clientId, connectorId, socketId: socket.id });
+    recordConsoleLog("success", "Connector registered", { source: "socket", clientId, connectorId, socketId: socket.id });
   });
 
   socket.on(SOCKET_EVENTS.connectorHeartbeat, (_payload = {}, acknowledge = () => {}) => {
@@ -97,6 +108,17 @@ export function registerConnectorSocketHandlers(socket) {
     const result = { success: true, at: socket.data.lastSeenAt };
     ack(result);
     socket.emit(SOCKET_EVENTS.connectorHeartbeatAck, result);
+    // Recover queued work if a one-time push signal was missed while this
+    // authenticated socket stayed connected.
+    emitPendingSalesOrders(socket.data.clientId, socket)
+      .catch((error) => {
+        console.error("Could not reconcile queued sales orders:", error.message);
+        recordConsoleLog("error", "Could not reconcile queued sales orders", {
+          source: "socket",
+          clientId: socket.data.clientId,
+          connectorId: socket.data.connectorId,
+        });
+      });
   });
 
   socket.on(SOCKET_EVENTS.connectorAck, (payload = {}) => {
@@ -111,6 +133,13 @@ export function registerConnectorSocketHandlers(socket) {
       event: payload.event,
       at: payload.at,
     });
+    recordConsoleLog("success", "Connector acknowledged server event", {
+      source: "socket",
+      clientId: socket.data.clientId,
+      connectorId: socket.data.connectorId,
+      event: payload.event,
+      requestId: payload.request_id,
+    });
   });
 
   socket.on(SOCKET_EVENTS.salesOrderUpdate, async (payload = {}) => {
@@ -124,8 +153,10 @@ export function registerConnectorSocketHandlers(socket) {
         tally_result: payload.tally_result,
       });
       console.info("Sales order job update:", { clientId: socket.data.clientId, requestId: payload.request_id, status: payload.status });
+      recordConsoleLog(payload.status === "failed" ? "error" : payload.status === "succeeded" ? "success" : "info", `Sales order ${payload.status}`, { source: "job", clientId: socket.data.clientId, requestId: payload.request_id });
     } catch (error) {
       console.error("Could not save sales order result:", error.message);
+      recordConsoleLog("error", "Could not save sales order result", { source: "job", clientId: socket.data.clientId, requestId: payload.request_id });
     }
   });
 }
