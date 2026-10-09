@@ -7,6 +7,7 @@ const client = new MongoClient(mongoUri, { serverSelectionTimeoutMS: 5_000 });
 let connectionPromise;
 
 export async function getMongoDb() {
+  console.log("Connecting to MongoDB at:", mongoUri, "Database:", mongoDbName);
   if (!connectionPromise) {
     connectionPromise = client.connect().then(() => client.db(mongoDbName)).catch((cause) => {
       connectionPromise = undefined;

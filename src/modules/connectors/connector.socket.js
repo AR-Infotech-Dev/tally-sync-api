@@ -36,7 +36,14 @@ export function registerConnectorSocketHandlers(socket) {
     try {
       client = await findActiveClient(clientId);
     } catch (error) {
-      console.error("Connector authentication lookup failed:", error.message);
+      const cause = error.cause || error;
+      const safeMessage = String(cause.message || error.message)
+        .replace(/mongodb(?:\+srv)?:\/\/[^\s"'`]+/gi, "[redacted MongoDB URI]");
+      console.error("Connector authentication lookup failed:", {
+        name: cause.name || error.name,
+        code: cause.code || cause.codeName || "unknown",
+        message: safeMessage,
+      });
       ack({ success: false, code: "REGISTRATION_UNAVAILABLE", message: "Connector registration is temporarily unavailable." });
       return;
     }
