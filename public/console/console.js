@@ -38,7 +38,7 @@ function showLogin(message = "", isError = false) {
       <div class="login-card">
         <div class="brand"><span class="brand-mark">TS</span><div><p class="eyebrow">FLOWUPS · SERVER</p><h1>Admin Console</h1></div></div>
         <h2>Sign in</h2>
-        <p>Sign in to inspect server health, connected Tally Connectors, sales order jobs, and recent activity.</p>
+        <p>Sign in to inspect server health, connected Tally Connectors, transaction jobs, and recent activity.</p>
         <form id="login-form" class="login-form">
           <label>Username<input name="username" autocomplete="username" required /></label>
           <label>Password<input name="password" type="password" autocomplete="current-password" required /></label>
@@ -136,11 +136,11 @@ function renderDashboard(snapshot) {
     <section class="content-grid">
       <div>
         <section class="panel"><div class="panel-heading"><h2>Registered Connectors</h2><span>${socket.connectors.length} online</span></div>${renderConnectorTable(socket.connectors)}</section>
-        <section class="panel"><div class="panel-heading"><h2>Recent Sales Order Jobs</h2><span>${jobs.length} recent</span></div>${renderJobsTable(jobs)}</section>
+        <section class="panel"><div class="panel-heading"><h2>Recent Sales Voucher and Order Jobs</h2><span>${jobs.length} recent</span></div>${renderJobsTable(jobs)}</section>
       </div>
       <section class="panel"><div class="panel-heading"><h2>Live Server Activity</h2><div class="log-toolbar"><span>${logs.length} recent</span><select id="log-level" aria-label="Filter log level"><option value="all">All levels</option><option value="info">Info</option><option value="success">Success</option><option value="warn">Warning</option><option value="error">Error</option></select></div></div><div id="log-list" class="log-list">${renderLogs(logs)}</div></section>
     </section>
-    <p class="footer-note">Refreshes every 15 seconds. Activity logs are held in memory since the last Server start; sales order jobs are read from MongoDB. API keys and voucher payloads are never shown here.</p>`;
+    <p class="footer-note">Refreshes every 15 seconds. Activity logs are held in memory since the last Server start; transaction jobs are read from MongoDB. API keys and voucher payloads are never shown here.</p>`;
 
   document.querySelector("#refresh-button").addEventListener("click", refreshSnapshot);
   document.querySelector("#logout-button").addEventListener("click", logout);
@@ -161,11 +161,13 @@ function renderConnectorTable(connectors) {
 }
 
 function renderJobsTable(jobs) {
-  if (!jobs.length) return `<div class="empty">No Sales Order jobs have been stored yet.</div>`;
-  return `<div class="table-wrap"><table><thead><tr><th>Created</th><th>Request</th><th>Status</th><th>Try</th><th>Error</th></tr></thead><tbody>${jobs.map((job) => {
-    const voucherNumber = job.sales_order?.voucher_number ? ` · ${job.sales_order.voucher_number}` : "";
+  if (!jobs.length) return `<div class="empty">No transaction jobs have been stored yet.</div>`;
+  return `<div class="table-wrap"><table><thead><tr><th>Created</th><th>Transaction</th><th>Request</th><th>Status</th><th>Try</th><th>Error</th></tr></thead><tbody>${jobs.map((job) => {
+    const transactionName = ({ sales_order: "Sales Order", sales_voucher: "Sales", receipt_voucher: "Receipt", purchase_order: "Purchase Order", purchase_voucher: "Purchase", payment_voucher: "Payment" })[job.transaction_type] || "Transaction";
+    const voucherData = job.sales?.voucher_number ? job.sales : job.sales_order || job.purchase_order || job.purchase || job.payment || {};
+    const voucherNumber = voucherData.voucher_number ? ` · ${voucherData.voucher_number}` : "";
     const company = job.destination?.company || job.destination?.company_name || "";
-    return `<tr><td class="truncate">${escapeHtml(formatTime(job.created_at))}</td><td class="mono truncate" title="${escapeHtml(job.request_id)}">${escapeHtml(job.request_id)}${escapeHtml(voucherNumber)}</td><td><span class="status-tag ${escapeHtml(job.status)}">${escapeHtml(job.status)}</span></td><td>${Number(job.attempt_count) || 0}</td><td class="truncate" title="${escapeHtml(job.error || company)}">${escapeHtml(job.error || company || "—")}</td></tr>`;
+    return `<tr><td class="truncate">${escapeHtml(formatTime(job.created_at))}</td><td>${escapeHtml(transactionName)}</td><td class="mono truncate" title="${escapeHtml(job.request_id)}">${escapeHtml(job.request_id)}${escapeHtml(voucherNumber)}</td><td><span class="status-tag ${escapeHtml(job.status)}">${escapeHtml(job.status)}</span></td><td>${Number(job.attempt_count) || 0}</td><td class="truncate" title="${escapeHtml(job.error || company)}">${escapeHtml(job.error || company || "—")}</td></tr>`;
   }).join("")}</tbody></table></div>`;
 }
 

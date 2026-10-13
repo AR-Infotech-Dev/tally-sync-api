@@ -30,6 +30,7 @@ export async function listRecentConsoleSalesOrders(limit = 30) {
       request_id: 1,
       client_id: 1,
       status: 1,
+      transaction_type: 1,
       attempt_count: 1,
       created_at: 1,
       updated_at: 1,
@@ -37,6 +38,10 @@ export async function listRecentConsoleSalesOrders(limit = 30) {
       "destination.company": 1,
       "destination.company_name": 1,
       "sales_order.voucher_number": 1,
+      "sales.voucher_number": 1,
+      "purchase_order.voucher_number": 1,
+      "purchase.voucher_number": 1,
+      "payment.voucher_number": 1,
     },
   }).sort({ created_at: -1 }).limit(safeLimit).toArray();
 }

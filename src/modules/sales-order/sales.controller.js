@@ -1,6 +1,6 @@
 import { asyncHandler } from "../../shared/utils/asyncHandler.js";
 import { failureResponse, successResponse } from "../../shared/utils/apiResponse.js";
-import { queueSalesOrder, readSalesOrder } from "./sales.service.js";
+import { queueSalesOrder, readSalesOrder, waitForSalesOrderCompletion } from "./sales.service.js";
 import { validateSalesOrderRequest } from "./sales.validator.js";
 
 export const pushSalesOrder = asyncHandler(async (req, res) => {
@@ -15,15 +15,43 @@ export const pushSalesOrder = asyncHandler(async (req, res) => {
   }
 
   const result = await queueSalesOrder({ ...req.body, client_id: req.client.client_id });
+  const completion = await waitForSalesOrderCompletion(req.client.client_id, result.request.request_id, {
+    shouldStop: () => res.destroyed,
+  });
+  if (completion.disconnected) return;
+  if (!completion.request) return failureResponse(res, { code: 2004, httpStatus: 404, message: "Sales order request was not found while waiting for the Connector." });
+  if (completion.timedOut) {
+    return failureResponse(res, {
+      code: 2011,
+      httpStatus: 504,
+      message: "The Connector has not returned a Tally result before the response timeout. The request remains queued or processing.",
+      data: { request_id: completion.request.request_id, status: completion.request.status },
+    });
+  }
+  if (completion.request.status === "failed") {
+    return failureResponse(res, {
+      code: 2012,
+      httpStatus: 502,
+      message: "Tally did not accept the Sales Order.",
+      data: { request_id: completion.request.request_id, status: completion.request.status, error: completion.request.error },
+    });
+  }
+
+  const tallyResult = completion.request.tally_result || null;
+  const submittedVoucherNumber = completion.request.sales_order?.voucher_number || completion.request.sales_order?.order_number || null;
+  const voucherNumber = tallyResult?.voucher_number_source === "tally" ? tallyResult.voucher_number : null;
   return successResponse(res, {
-    code: 1001,
-    httpStatus: 202,
-    message: result.duplicate ? "Sales order request already exists." : "Sales order accepted for processing.",
+    code: 1000,
+    httpStatus: 200,
+    message: "Tally accepted the Sales Order.",
     data: {
-      request_id: result.request.request_id,
-      status: result.request.status,
+      request_id: completion.request.request_id,
+      status: completion.request.status,
       duplicate: result.duplicate,
-      connector_notified: result.connectorNotified,
+      transaction_type: completion.request.transaction_type,
+      voucher_number: voucherNumber,
+      submitted_voucher_number: tallyResult?.submitted_voucher_number || submittedVoucherNumber,
+      tally_result: tallyResult,
     },
   });
 });
