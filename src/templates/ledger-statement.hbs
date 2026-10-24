@@ -1,204 +1,28 @@
 <!doctype html>
-<html lang="en">
-
-<head>
-  <meta charset="utf-8">
-  <title>Ledger statement - {{ledger_name}}</title>
-  <style>
-    @font-face {
-      font-family: Statement;
-      src: url(data:font/woff;base64,{{{latin_font}}}) format('woff');
-      font-weight: 400;
-    }
-
-    @font-face {
-      font-family: Statement;
-      src: url(data:font/woff;base64,{{{devanagari_font}}}) format('woff');
-      font-weight: 400;
-      unicode-range: U+0900-097F, U+200C-200D;
-    }
-
-    @page {
-      size: A4;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      font-family: Statement, sans-serif;
-      font-size: 10px;
-      line-height: 1.5;
-      color: #243247;
-    }
-
-    h1 {
-      margin: 0 0 4px;
-      font-size: 22px;
-      font-weight: 600;
-      overflow-wrap: anywhere;
-    }
-
-    h2 {
-      margin: 0 0 12px;
-      font-size: 12px;
-      color: #2862d7;
-      letter-spacing: .06em;
-    }
-
-    .ledger {
-      font-size: 14px;
-      margin-bottom: 3px;
-      overflow-wrap: anywhere;
-    }
-
-    .period {
-      margin-bottom: 12px;
-    }
-
-    .summary {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 5px;
-    }
-
-    .summary span {
-      overflow-wrap: anywhere;
-    }
-
-    .muted {
-      color: #69768a;
-      font-size: 9px;
-      margin-bottom: 14px;
-    }
-
-    .stale {
-      padding: 8px;
-      color: #8d5900;
-      background: #fff5df;
-      margin-bottom: 10px;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-    }
-
-    thead {
-      display: table-header-group;
-    }
-
-    th {
-      background: #eaf0f8;
-      text-align: left;
-      font-size: 9px;
-      padding: 8px 5px;
-      font-weight: 600;
-    }
-
-    td {
-      vertical-align: top;
-      border-bottom: 1px solid #dfe5ee;
-      padding: 8px 5px;
-      overflow-wrap: anywhere;
-    }
-
-    .number {
-      text-align: right;
-    }
-
-    .type,
-    .narration {
-      display: block;
-      margin-top: 3px;
-      color: #69768a;
-    }
-
-    .narration {
-      white-space: pre-wrap;
-    }
-
-    .totals td {
-      background: #f3f6fb;
-      font-weight: 600;
-    }
-
-    .empty {
-      text-align: center;
-      padding: 24px;
-      color: #69768a;
-    }
-
-    .note {
-      font-size: 9px;
-      color: #69768a;
-      margin-top: 12px;
-    }
-  </style>
-</head>
-
+<html lang="en"><head><meta charset="utf-8"><title>Ledger statement - {{ledger_name}}</title></head>
 <body>
-  <header>
-    <h1>{{company}}</h1>
-    <h2>LEDGER STATEMENT</h2>
-    <div class="ledger">{{ledger_name}}</div>
-    <div class="period">{{from_date}} to {{to_date}}</div>
-    <div class="summary"><span>Opening balance: <strong>{{opening_balance}}</strong></span><span>Closing balance:
-        <strong>{{closing_balance}}</strong></span></div>
-    {{!-- <div class="muted">Last synced (UTC): {{last_synced_at}}</div> --}}
-    {{#if is_stale}}<div class="stale">Cached data - latest Tally changes may not be included.</div>{{/if}}
-  </header>
-  <table>
-    <colgroup>
-      <col style="width:11%">
-      <col style="width:16%">
-      <col style="width:31%">
-      <col style="width:13%">
-      <col style="width:13%">
-      <col style="width:16%">
-    </colgroup>
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Voucher / Type</th>
-        <th>Particulars / Narration</th>
-        <th class="number">Debit</th>
-        <th class="number">Credit</th>
-        <th class="number">Balance</th>
-      </tr>
-    </thead>
+  <h1>{{company}}</h1>
+  <h2>LEDGER STATEMENT</h2>
+  <p class="ledger">{{ledger_name}}</p>
+  <p>{{from_date}} to {{to_date}}</p>
+  <p>Opening balance: <strong>{{opening_balance}}</strong><br>Closing balance: <strong>{{closing_balance}}</strong></p>
+  {{#if is_stale}}<p class="stale">Cached data - latest Tally changes may not be included.</p>{{/if}}
+  <table data-pdfmake='{"widths":[49,73,"*",57,57,74],"headerRows":1,"layout":"lightHorizontalLines"}'>
+    <thead><tr><th>Date</th><th>Voucher / Type</th><th>Particulars / Narration</th><th class="number">Debit</th><th class="number">Credit</th><th class="number">Balance</th></tr></thead>
     <tbody>
       {{#each entries}}
       <tr>
         <td>{{date}}</td>
-        <td>{{voucher_no}}<span class="type">{{voucher_type}}</span></td>
-        <td>{{particulars}}{{#if narration}}<span class="narration">{{narration}}</span>{{/if}}</td>
-        <td class="number">{{debit}}</td>
-        <td class="number">{{credit}}</td>
-        <td class="number">{{balance}}</td>
+        <td>{{voucher_no}}<br><span class="type">{{voucher_type}}</span></td>
+        <td>{{particulars}}{{#if narration}}<br><span class="narration">{{narration}}</span>{{/if}}</td>
+        <td class="number">{{debit}}</td><td class="number">{{credit}}</td><td class="number">{{balance}}</td>
       </tr>
       {{else}}
-      <tr>
-        <td colspan="6" class="empty">No transactions in this period.</td>
-      </tr>
+      <tr><td colspan="6" style="text-align:center;color:#69768a">No transactions in this period.</td></tr>
       {{/each}}
-      <tr class="totals">
-        <td colspan="3">Period totals</td>
-        <td class="number">{{total_debit}}</td>
-        <td class="number">{{total_credit}}</td>
-        <td></td>
-      </tr>
-      <tr class="totals">
-        <td colspan="5">Closing balance</td>
-        <td class="number">{{closing_balance}}</td>
-      </tr>
+      <tr><td colspan="3" style="background-color:#f3f6fb"><strong>Period totals</strong></td><td class="number"><strong>{{total_debit}}</strong></td><td class="number"><strong>{{total_credit}}</strong></td><td></td></tr>
+      <tr><td colspan="5" style="background-color:#f3f6fb"><strong>Closing balance</strong></td><td class="number"><strong>{{closing_balance}}</strong></td></tr>
     </tbody>
   </table>
   <p class="note">Amounts in company base currency.</p>
-</body>
-
-</html>
+</body></html>
