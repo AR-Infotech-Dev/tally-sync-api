@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Browser, computeExecutablePath, detectBrowserPlatform, install } from '@puppeteer/browsers';
 import { PUPPETEER_REVISIONS } from 'puppeteer-core';
+import { ensurePdfBrowserLibraries } from './pdf-browser-libraries.service.js';
 
 export function createPdfBrowserResolver({ env = process.env, platform = process.platform, exists = async p => { try { await access(p, constants.X_OK); return true; } catch { return false; } }, installBrowser = install } = {}) {
   let pending;
@@ -35,4 +36,9 @@ export function createPdfBrowserResolver({ env = process.env, platform = process
   };
 }
 
-export const resolvePdfBrowser = createPdfBrowserResolver();
+const resolveExecutable = createPdfBrowserResolver();
+export async function resolvePdfBrowser() {
+  const executable = await resolveExecutable();
+  await ensurePdfBrowserLibraries(executable);
+  return executable;
+}
