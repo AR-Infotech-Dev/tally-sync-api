@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
+import { buildCredentialsEmail } from "./client-credentials.utils.js";
 
-export async function sendClientCredentialsEmail({ email, name, clientId, connectorId, apiKey, connectorKey }) {
+export async function sendClientCredentialsEmail({ email, name, clientId, connectorId, apiKey, connectorKey, activationCode }) {
   const { EMAIL_USER, EMAIL_PASS } = process.env;
   if (!EMAIL_USER || !EMAIL_PASS) {
     const error = new Error("Gmail is not configured. Set EMAIL_USER and EMAIL_PASS in the server environment.");
@@ -17,18 +18,6 @@ export async function sendClientCredentialsEmail({ email, name, clientId, connec
     from: EMAIL_USER,
     to: email,
     subject: "Your Tally Sync Connector credentials",
-    text: [
-      `Hello ${name},`,
-      "",
-      "Your Tally Sync client registration is complete.",
-      `Client ID: ${clientId}`,
-      `Connector ID: ${connectorId}`,
-      "",
-      `API key: ${apiKey}`,
-      `Connector key: ${connectorKey}`,
-      "",
-      "Use the API key only in your application. Enter the Connector key in the Tally Sync Connector app.",
-      "These credentials are shown only in this email. Store them securely.",
-    ].join("\n"),
+    text: buildCredentialsEmail({name, clientId, connectorId, apiKey, connectorKey, activationCode}),
   });
 }

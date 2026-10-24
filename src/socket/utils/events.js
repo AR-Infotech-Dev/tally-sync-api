@@ -6,6 +6,8 @@ export const SOCKET_EVENTS = Object.freeze({
   connectorAck: "connector:ack",
   connectorTest: "connector:test",
   salesOrderPush: "sales-order:push",
+  salesOrderFetch: "sales-order:fetch",
+  ledgerStatementFetch: "ledger-statement:fetch",
   salesVoucherPush: "sales-voucher:push",
   receiptVoucherPush: "receipt-voucher:push",
   purchaseOrderPush: "purchase-order:push",

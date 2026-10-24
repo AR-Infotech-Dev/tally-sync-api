@@ -53,3 +53,12 @@ export async function deleteClient(clientId) {
   const collection = await getClientCollection();
   await collection.deleteOne({ client_id: clientId, status: "pending_email" });
 }
+
+export async function consumeActivation(hash) {
+  const collection = await getClientCollection();
+  return collection.findOneAndUpdate(
+    { activation_hash: hash, status: 'active', activation_expires_at: { $gt: new Date() } },
+    { $unset: { activation_hash: '', activation_expires_at: '' }, $set: { connector_activated_at: new Date() } },
+    { returnDocument: 'before', projection: { client_id: 1, connector_id: 1 } },
+  );
+}

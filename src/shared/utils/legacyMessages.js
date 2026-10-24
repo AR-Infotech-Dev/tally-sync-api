@@ -13,8 +13,11 @@ export const httpStatusCodes = {
   405: "METHOD_NOT_ALLOWED",
   409: "CONFLICT",
   422: "UNPROCESSABLE_ENTITY",
+  424: "FAILED_DEPENDENCY",
   500: "INTERNAL_SERVER_ERROR",
-  503: "SERVICE_UNAVAILABLE"
+  502: "BAD_GATEWAY",
+  503: "SERVICE_UNAVAILABLE",
+  504: "GATEWAY_TIMEOUT"
 };
 
 // ===============================

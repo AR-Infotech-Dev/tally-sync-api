@@ -1,6 +1,44 @@
 # Tally Sync API
 
+## Ledger statements
+
+### PDF preview/download
+
+Use `POST /api/v1/ledgers/statement/pdf` with the same JSON body and `X-Client-ID` / `X-API-Key` headers as the statement API. Alternatively, request `POST /api/v1/ledgers/statement?format=pdf`. Both use the same authenticated local-cache job; no additional Tally export is performed. A successful response is PDF bytes (`Content-Type: application/pdf`, attachment disposition, no-store); failures keep the normal JSON error response. The original statement endpoint still returns JSON by default. In Postman use PDF Preview or Save Response to File. Frontends should request a Blob, then display its object URL in a PDF viewer.
+
+The Server fills Server/src/templates/ledger-statement.hbs using Handlebars, then renders the HTML to PDF with puppeteer-core and installed Chrome/Chromium/Edge. PDF formatting lives in that HBS file; the shared page footer lives in Server/src/templates/pdf-footer.hbs. The view model in ledger-pdf.utils.js formats fields, while ledger-pdf.service.js loads/renders templates and runs the browser. Bundled OFL Noto fonts support Latin/Devanagari. Output includes company, ledger, period, opening/closing balance, debit/credit totals, particulars, narration, running balances, last-sync timestamp and a stale-data notice when applicable. Tables repeat headings on each page, long rows continue across pages, and footers include page counts. PDFs are generated in memory per request and are not stored permanently. Deploy Server/src/templates along with source, install dependencies with the lockfile (`npm ci`), and restart Server. Install Chrome/Chromium/Edge on the Server; set PDF_BROWSER_EXECUTABLE_PATH to its executable when not in a standard detected path (for example /usr/bin/chromium on Linux). The browser runs headlessly with normal sandbox protections. JavaScript and external asset requests are disabled; fonts are embedded, and Handlebars escapes statement values. Template edits are read on the next request. The existing Connector statement result is reused.
+
+Ledger statement requests now read the Connector local SQLite snapshot. The Connector syncs all ledger masters and voucher allocations on connection, then checks for changes every 180 seconds. If a company is configured, that company is synced; otherwise all open companies are synced sequentially. No statement request makes a Tally HTTP call.
+
+`POST /api/v1/ledgers/statement` uses the existing client-key authentication and Connector job flow to read normalized ledger movements from the Connector SQLite snapshot. Example body:
+
+```json
+{
+  "company": "Sai Enterprises",
+  "ledger_name": "Anjan Ambare",
+  "from_date": "2026-10-01",
+  "to_date": "2026-10-31"
+}
+```
+
+`ledger_name`, `from_date` and `to_date` are required. Dates are inclusive and must be real `YYYY-MM-DD` dates between 1900 and 2099; `from_date <= to_date`. `company` is optional and defaults to the Connector's configured Tally company. Explicit company always takes precedence. Use `X-Client-ID` and `X-API-Key` headers. Update both Server and Connector. Keep the company open during sync. After a successful snapshot, Tally may be offline while the Connector continues serving cached statements.
+
+The successful POST response has a `data` object with company, ledger_name, from_date, to_date, opening_balance, entries, total_debit, total_credit and closing_balance. Each entry has date, voucher_no, voucher_type, master_id, narration, particulars (other ledger names), debit, credit and balance. Balances are `{ "amount": 250, "type": "Dr" }` or `Cr`; zero uses `type: null`. Amounts use two decimal places and the company's base currency. Debit and credit totals cover only the requested period. Opening is the ledger master's opening plus posted movements before from_date; closing is opening plus period debits minus credits. Voucher allocations are matched by ledger name, including entries where the ledger is not the party. Cancelled, optional, order and non-accounting inventory vouchers do not contribute posted ledger entries. Rows sort by date then MasterID. This statement reflects current Tally data and does not reproduce user-selected report display settings or outstanding bill ageing.
+
+The successful data includes source: local_sqlite, last_synced_at, sync_status (ready/syncing/stale) and is_stale. Reads use the last atomically published company snapshot. An uninitialized cache returns 503, missing cached ledger returns 404, and an existing ledger with no movements returns an empty entries array. A sync failure keeps the previous snapshot and marks data stale. The Connector must still be running/registered for the Server API to reach its local database. A 504 returns an internal request_id, readable with GET /api/v1/ledgers/{requestId}/status. MongoDB retention removes request jobs, not the SQLite accounting history.
+
+Sync stores company GUID, ledger opening balances, voucher MasterID/AlterID signatures and normalized ledger allocations. Every cycle exports small full ID manifests plus ledger masters; only changed voucher details are fetched in batches of at most 25, with 250 ms pauses. A second manifest and ledger snapshot verifies the source stayed stable before publishing. Deleted IDs are removed atomically; old edits, cancellations, and ledger renames are reconciled. This is not zero-load synchronization: initial sync and manifest scans still read Tally. Very large exports can exceed existing 5 MB response/timeout limits and fail while preserving the last complete snapshot. Sync coverage starts at the company BooksFrom/StartingFrom date and extends through 2099-12-31; using a date before the books start can make Tally silently fall back to its current financial period and amounts use base-currency two-decimal precision.
+
+SQLite uses WAL under Electron userData/ledger-cache.sqlite. Client/server/Tally endpoint and company GUID isolate stored data. Statements store no prepared per-period copies. Do not put the database on a network share or copy an active WAL database as a backup; use SQLite backup tooling. Local database encryption is not enabled by this change.
+
+
 ## Sales Order push API
+
+For Sales vouchers (including custom types under Sales such as `Sales New`), use `GET /api/v1/sales?company=Sai%20Enterprises&ledger_name=Anjan%20Ambare&voucher_no=44&voucher_date=2026-10-31`. This uses the same authenticated direct Tally lookup flow and returns `vouchers[0].details`. `/sales-orders` continues to retrieve Sales Orders only. No prior import record is required. Update both Server and Connector.
+
+Sales Order status is now `GET /api/v1/sales-orders/:requestId/status`. The former client `GET /sales-orders/:requestId` route has been removed; update CRM callers. The internal Connector payload route remains `GET /sales-orders/:requestId/connector`.
+
+To read an existing Sales Order directly from Tally, call `GET /api/v1/sales-orders?company=Sai%20Enterprises&ledger_name=Customer%20Name&voucher_no=SO-1001` with `X-Client-ID` and `X-API-Key`. Supply optional `voucher_date=YYYY-MM-DD` if numbers repeat across years. No prior MongoDB import record or caller-supplied request ID is needed. The API queues a read-only lookup through the existing Connector job flow and waits for the result. A successful JSON response contains `vouchers[0].company`, `vouchers[0].ledger_name`, `vouchers[0].voucher_no`, and the complete structured voucher in `vouchers[0].details` (lowercase Tally field names; `.LIST` entries are always arrays; attributes are under `_attributes`; text with attributes is under `_text`; scalar values remain strings to preserve identifiers and decimal precision). No match returns 404, multiple matches return 409, upstream failures return 502, and a Connector timeout returns 504 with an internal job ID usable at the status endpoint. Both Server and Connector must be updated; Tally must have the requested company open. Temporary lookup jobs follow request retention and do not serve as the source of future lookups.
 
 `POST /api/v1/sales-orders/push` accepts a CRM Sales Order, keeps the full JSON document in MongoDB, and notifies the registered Connector for the authenticated client with a `sales-order:push` event containing only the `request_id`.
 
@@ -10,9 +48,11 @@ Configure `MONGODB_URI` and `MONGODB_DB_NAME` in `.env` (see `.env.example`). If
 
 Sales transaction request documents are retained for 90 days after they reach `succeeded` or `failed`. Set `REQUEST_RETENTION_DAYS` in the Server environment to change that period. MongoDB creates a TTL index on first use and removes expired request documents in the background; deletion can occur later than the exact expiry time. Queued and in-progress requests do not expire.
 
-Sales Voucher PDFs are stored in the separate `sales_voucher_pdfs` collection, not in the request document. Their default retention is 90 days from PDF completion; set `SALES_PDF_RETENTION_DAYS` to change it. A PDF expires no later than its request record, so it will not be left behind after the CRM can no longer access the request. These indexes are created automatically when the feature first accesses each collection. Keep MongoDB storage sized for PDFs.
+Sales Voucher PDFs are stored in the separate `sales_voucher_pdfs` collection, not in the request document. Their default retention is 90 days from PDF completion; set `SALES_PDF_RETENTION_DAYS` to change it. Request-ID PDFs expire no later than their source request. Direct Tally lookup PDFs have independent retention; even queued direct lookup jobs receive an expiry. These indexes are created automatically when the feature first accesses each collection. Keep MongoDB storage sized for PDFs.
 
 CRM downloads a Sales Voucher PDF on demand with `GET /api/v1/sales/{requestId}/pdf` and its client API key. The first call returns `202` while the Connector processes the export; call the same endpoint again to receive `application/pdf` after it is ready. After a failed attempt, add `?retry=true` to request another export. Connector uploads use the authenticated `POST /api/v1/sales/{requestId}/pdf/connector` endpoint.
+
+To export directly from Tally, use `GET /api/v1/sales/pdf?company=Your%20Company&ledger_name=Customer%20Name&voucher_no=INV%2F001` with `X-Client-ID` and `X-API-Key`. No prior import or request ID is required. The Connector queries Sales vouchers in the requested company using the exact party ledger and voucher number, resolves the internal MasterID, and exports Tally's Printed Invoice PDF. `party_ledger` and `voucher_number` remain aliases. An optional `voucher_date=YYYY-MM-DD` disambiguates repeated numbers across years. Without a date the lookup searches 1900-01-01 through 2099-12-31. Zero or multiple matches fail the export instead of selecting an arbitrary voucher. The first call returns 202; poll the same URL for PDF bytes, or 424 with the Connector error. Use `retry=true` after correcting a failed lookup/export. Completed PDFs are cached until retention expiry and automatically regenerated after expiry/deletion; credentials and MongoDB must remain available for authentication and temporary jobs. Update both Server and Connector for this flow. The Connector and Tally must be running, with the company open. A failed Tally PDF export is still surfaced as a failure, never replaced with a generated imitation invoice.
 
 Example request:
 
@@ -93,7 +133,7 @@ Submit a JSON sales order using `POST /api/v1/sales-orders/push` with `X-Client-
 
 The `sales_order` object supports nested `party`, `consignee`, `company`, and `party_ledger_entry` blocks, uses `voucher_type` and `voucher_mode`/`is_invoice`, and accepts `items`, `line_items`, or `lineItems`. Each item needs `stock_item` (or `item_name`), `quantity`, and `rate`; optional HSN, taxability, actual quantity, batch/godown, and sales ledger data are included in XML. The configured Tally company name in Connector settings takes precedence over `destination.company` or `destination.company_name`. Optional `custom_fields` can be supplied on the order/header; keys must match Tally's UDF technical field names and values must be scalar JSON values.
 
-On success, the API responds with HTTP `200` and returns `request_id`, `status`, `voucher_number`, and `tally_result` after Tally accepts the voucher. Tally failures return HTTP `502`. If no terminal Connector result arrives before `CONNECTOR_RESPONSE_TIMEOUT_MS`, the API returns HTTP `504` with the `request_id`; the saved request remains available through `GET /api/v1/sales-orders/:requestId`. Status moves through `queued`, `fetching`, `building_xml`, `pushing`, then `succeeded` or `failed`. The Connector fetch endpoint is internal: `GET /api/v1/sales-orders/:requestId/connector`, authenticated with `X-Client-ID` and `X-Connector-Key`.
+On success, the API responds with HTTP `200` and returns `request_id`, `status`, `voucher_number`, and `tally_result` after Tally accepts the voucher. Tally failures return HTTP `502`. If no terminal Connector result arrives before `CONNECTOR_RESPONSE_TIMEOUT_MS`, the API returns HTTP `504` with the `request_id`; the saved request remains available through `GET /api/v1/sales-orders/:requestId/status`. Status moves through `queued`, `fetching`, `building_xml`, `pushing`, then `succeeded` or `failed`. The Connector fetch endpoint is internal: `GET /api/v1/sales-orders/:requestId/connector`, authenticated with `X-Client-ID` and `X-Connector-Key`.
 # tally-sync-api
 
 # Admin Console
@@ -140,3 +180,19 @@ Submit an invoice Sales Voucher with `POST /api/v1/sales/push` and the client he
 `date`, customer ledger, at least one stock item, positive quantity, and a valid rate are required. `voucher_type` defaults to `Sales`; use the exact voucher type name configured in Tally if it differs. The Connector uses its configured Tally company when present, otherwise `destination.company` / `destination.company_name`. The party ledger amount is derived as the negative total when not supplied.
 
 If the CRM connection times out before a final response, retrieve the saved result with `GET /api/v1/sales/:requestId` using the same client headers. The Connector-only fetch endpoint is `GET /api/v1/sales/:requestId/connector` with `X-Client-ID` and `X-Connector-Key`.
+
+
+## Client onboarding and credentials
+
+New accounts use this setup flow: register -> enter the emailed activation code -> test Tally -> select an open company -> complete the first sync -> open Monitor. Connector setup resumes after restart. Existing clients can continue using their existing credentials.
+
+- Application authentication stays `X-Client-ID` plus `X-API-Key`. The API key is the application secret; there is no separate API Secret field.
+- Connector authentication uses its own Connector Key, stored encrypted by the desktop app. Never substitute the application API key for it.
+- `POST /api/v1/clients/activate-connector` accepts `{ "activation_code": "<code from email>" }`. It returns `client_id`, `connector_id` and `connector_key` with `Cache-Control: no-store`; it never returns the API key.
+- Activation codes expire 24 hours after registration and are atomically consumed once. Only the code hash and expiry are stored. Rate limit: 10 attempts per 15 minutes using the existing rate limiter.
+- A lost activation response, expired code, or interrupted local save can be recovered using the manual Connector credentials in the same registration email. Existing accounts without activation codes use manual setup.
+- Registration emails separate Connector activation, application API headers and manual Connector recovery. Registration responses still contain IDs and email-delivery status only, with no secrets.
+- Remote activation requires HTTPS in the desktop client; loopback HTTP is supported for development. The Server must be deployed behind HTTPS for public traffic.
+- The registration API still activates the existing account after email delivery; this change does not introduce a separate email-verification link or reset/key-rotation portal.
+
+Verification: `node --test test/*.test.js` in Server and Connector. The onboarding HTTP test uses a local Express endpoint with a synthetic activation repository; it does not send mail or alter production MongoDB. Desktop/mobile previews use synthetic data.

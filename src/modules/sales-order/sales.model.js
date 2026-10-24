@@ -37,6 +37,7 @@ export async function createSalesOrderRequest(input) {
     client_id: input.client_id,
     destination: input.destination,
     transaction_type: input.transaction_type || "sales_order",
+    ...(input.lookup ? { lookup: input.lookup } : {}),
     ...(input.sales_order || input.sales ? { sales_order: input.sales_order || input.sales } : {}),
     ...(input.receipt ? { receipt: input.receipt } : {}),
     ...(input.purchase_order ? { purchase_order: input.purchase_order } : {}),
@@ -80,6 +81,22 @@ export async function markSalesOrderProcessing(clientId, requestId) {
 export async function getSalesOrderRequest(clientId, requestId) {
   const collection = await getCollection();
   return collection.findOne({ client_id: clientId, request_id: requestId });
+}
+
+export async function findSalesVouchersByNumber(clientId, company, voucherNumber, partyLedger) {
+  const collection = await getCollection();
+  return collection.find({
+    client_id: clientId,
+    transaction_type: "sales_voucher",
+    ...(partyLedger ? { "sales_order.party_ledger_entry.ledger": partyLedger } : {}),
+    $and: [
+      { $or: [{ "destination.company": company }, { "destination.company_name": company }] },
+      { $or: [
+        { "tally_result.voucher_number_source": "tally", "tally_result.voucher_number": voucherNumber },
+        { "tally_result.voucher_number_source": { $ne: "tally" }, "sales_order.voucher_number": voucherNumber },
+      ] },
+    ],
+  }).limit(2).toArray();
 }
 
 export async function updateSalesOrderRequest(clientId, requestId, update) {

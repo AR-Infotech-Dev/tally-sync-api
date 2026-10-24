@@ -20,6 +20,202 @@ tags:
   - name: Receipt Vouchers
   - name: Admin Console
 paths:
+  /api/v1/clients/activate-connector:
+    post:
+      tags: [Client Registration]
+      summary: Exchange a one-time emailed activation code for Connector credentials
+      operationId: activateConnector
+      security: []
+      description: >-
+        Code expires 24 hours after registration and is consumed atomically once.
+        Returns Connector credentials only; never returns the application API key.
+        Use HTTPS remotely. On failure or a lost response, use manual Connector
+        credentials from the registration email. Limited to 10 attempts per 15 minutes.
+        Existing application authentication remains X-Client-ID plus X-API-Key;
+        the API key is the secret and no separate API Secret is required.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [activation_code]
+              properties:
+                activation_code:
+                  type: string
+                  pattern: '^[A-Za-z0-9_-]{43}$'
+      responses:
+        '200':
+          description: Connector credentials; response has Cache-Control no-store.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  code: {type: integer}
+                  type: {type: string}
+                  message: {type: string}
+                  client_id: {type: string}
+                  connector_id: {type: string}
+                  connector_key: {type: string, description: Secret for Connector use only}
+        '400':
+          description: Missing or malformed activation code.
+        '401':
+          description: Invalid, expired or previously used activation code.
+        '429':
+          description: Too many activation attempts.
+  /api/v1/ledgers/statement/pdf:
+    post:
+      tags: [Ledger Statements]
+      summary: Generate a PDF ledger statement from the local synced snapshot
+      operationId: getLedgerStatementPdf
+      security:
+        - clientId: []
+          clientApiKey: []
+      description: >-
+        Uses the same company, ledger_name, from_date and to_date body as the JSON
+        statement endpoint. Returns a downloadable PDF with repeated headers, period
+        balances, transactions and freshness metadata. No extra Tally export occurs.
+        Errors remain JSON. PDF bytes are generated in memory and are not persisted.
+      requestBody:
+        $ref: '#/paths/~1api~1v1~1ledgers~1statement/post/requestBody'
+      responses:
+        '200':
+          description: Ledger statement PDF ready for preview or saving.
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              example: attachment; filename="statement-Anjan_Ambare-2026-10-01-2026-10-31.pdf"
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          description: Ledger or statement job not found.
+        '503':
+          description: Initial local sync has not completed.
+        '504':
+          description: Connector response timed out.
+  /api/v1/ledgers/statement:
+    post:
+      tags: [Ledger Statements]
+      summary: Read a normalized ledger statement from the Connector SQLite cache
+      operationId: getLedgerStatement
+      parameters:
+        - name: format
+          in: query
+          description: Set pdf for PDF bytes; omit for the existing JSON response.
+          schema:
+            type: string
+            enum: [json, pdf]
+      description: >-
+        Date range is inclusive. Company defaults to Connector settings if omitted.
+        Returns normalized base-currency entries, debit/credit totals, opening and
+        closing balances. Opening includes posted movements before from_date.
+        Connector performs initial and three-minute background Tally syncs.
+        This API never queries Tally directly. Requires a running Connector and
+        a completed local snapshot; returns 503 while the cache is uninitialized.
+        Tally can be offline after initial sync; stale data is explicitly marked.
+        Uses the existing asynchronous job flow while the HTTP request waits.
+      security:
+        - clientId: []
+          clientApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ledger_name, from_date, to_date]
+              properties:
+                company:
+                  type: string
+                ledger_name:
+                  type: string
+                from_date:
+                  type: string
+                  format: date
+                to_date:
+                  type: string
+                  format: date
+            example:
+              company: Sai Enterprises
+              ledger_name: Anjan Ambare
+              from_date: '2026-10-01'
+              to_date: '2026-10-31'
+      responses:
+        '200':
+          description: Normalized statement; no activity returns an empty entries array.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Ledger statement retrieved from local synced database.
+                data:
+                  company: Sai Enterprises
+                  ledger_name: Anjan Ambare
+                  from_date: '2026-10-01'
+                  to_date: '2026-10-31'
+                  opening_balance: {amount: 0, type: null}
+                  entries:
+                    - date: '2026-10-31'
+                      voucher_no: '44'
+                      voucher_type: Sales New
+                      master_id: '123'
+                      narration: ''
+                      particulars: [Sales]
+                      debit: 250
+                      credit: 0
+                      balance: {amount: 250, type: Dr}
+                  total_debit: 250
+                  total_credit: 0
+                  closing_balance: {amount: 250, type: Dr}
+                  source: local_sqlite
+                  last_synced_at: '2026-10-23T10:00:00.000Z'
+                  sync_status: ready
+                  is_stale: false
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          description: Ledger not found in the selected company.
+        '502':
+          description: Connector or local statement read failed.
+        '503':
+          description: Company local cache is not initialized; wait for the first successful sync.
+        '504':
+          description: Connector response timed out; request_id can be used at the status endpoint.
+  /api/v1/ledgers/{requestId}/status:
+    get:
+      tags: [Ledger Statements]
+      operationId: getLedgerStatementStatus
+      summary: Read a ledger statement job status and completed result
+      security:
+        - clientId: []
+          clientApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Job status with statement if completed or error if failed.
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /health:
     get:
       tags: [Health]
@@ -138,7 +334,74 @@ paths:
           $ref: '#/components/responses/ClientUnauthorized'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /api/v1/sales-orders/{requestId}:
+  /api/v1/sales-orders:
+    get:
+      tags: [Sales Orders]
+      summary: Fetch a Sales Order directly from Tally by party ledger and voucher number
+      operationId: getSalesOrderFromTally
+      description: >-
+        No prior import request is needed. The authenticated client's Connector searches
+        the specified Tally company for a Sales Order, then exports that voucher by
+        MasterID. The request waits for the existing Connector job flow. Returns the
+        structured JSON in vouchers[0].details, including nested allocation arrays. Field names are lowercase, .LIST suffixes are removed, attributes use _attributes and scalar values remain strings.
+        Without voucher_date, searches 1900-01-01 through 2099-12-31. This is read-only
+        in Tally. The temporary job follows transaction request retention.
+      security:
+        - clientId: []
+          clientApiKey: []
+      parameters:
+        - name: company
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: ledger_name
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: voucher_no
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: voucher_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Sales Order fetched from Tally.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: SUCCESS
+                message: Sales Order retrieved from Tally.
+                vouchers:
+                  - company: Sai Enterprises
+                    ledger_name: Customer Name
+                    voucher_no: SO-1001
+                    details:
+                      vouchernumber: SO-1001
+                      partyledgername: Customer Name
+                      allinventoryentries: []
+                      allledgerentries: []
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          description: No matching Sales Order found in Tally.
+        '409':
+          description: Multiple Sales Orders match; supply voucher_date.
+        '502':
+          description: Connector or Tally lookup/export failed.
+        '504':
+          description: Connector did not return a result before the response timeout.
+  /api/v1/sales-orders/{requestId}/status:
     get:
       tags: [Sales Orders]
       summary: Get Sales Order processing status
@@ -203,6 +466,55 @@ paths:
           $ref: '#/components/responses/ConnectorUnauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /api/v1/sales:
+    get:
+      tags: [Sales Vouchers]
+      summary: Fetch a Sales Voucher directly from Tally
+      operationId: getSalesVoucherFromTally
+      description: >-
+        Searches Sales-family vouchers, including custom types such as Sales New,
+        by exact party ledger and voucher number. No prior import request required.
+        Returns structured voucher JSON in vouchers[0].details. Optional date
+        disambiguates repeated numbers. Requires an updated running Connector.
+      security:
+        - clientId: []
+          clientApiKey: []
+      parameters:
+        - name: company
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: ledger_name
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: voucher_no
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: voucher_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Sales Voucher export returned in vouchers[0].details.
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          description: No matching Sales Voucher in Tally.
+        '409':
+          description: Multiple matches; supply voucher_date.
+        '502':
+          description: Tally lookup or export failed.
+        '504':
+          description: Connector result timed out.
   /api/v1/sales/push:
     post:
       tags: [Sales Vouchers]
@@ -333,6 +645,66 @@ paths:
           $ref: '#/components/responses/ConnectorUnauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /api/v1/sales/pdf:
+    get:
+      tags: [Sales Vouchers]
+      summary: Request or download a Sales Voucher PDF directly from Tally
+      operationId: requestSalesVoucherPdfByNumber
+      description: >-
+        Connector searches Tally by company, party ledger and voucher number without
+        a prior import request. Poll the same URL after 202. Zero or multiple Tally
+        matches fail the export (424); supply voucher_date to disambiguate. Cached
+        PDFs and temporary jobs have independent retention. Deleted cache is recreated.
+      security:
+        - clientId: []
+          clientApiKey: []
+      parameters:
+        - name: ledger_name
+          in: query
+          required: true
+          description: Exact party ledger name. party_ledger is a compatibility alias.
+          schema:
+            type: string
+            minLength: 1
+        - name: company
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - name: voucher_no
+          in: query
+          required: true
+          description: Exact Tally voucher number. voucher_number is a compatibility alias.
+          schema:
+            type: string
+            minLength: 1
+        - name: voucher_date
+          in: query
+          description: Optional date to disambiguate repeated voucher numbers across years.
+          schema:
+            type: string
+            format: date
+        - name: retry
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: PDF file is ready.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '202':
+          description: Export queued or in progress; poll again.
+        '400':
+          description: Invalid or missing company, ledger_name, voucher_no or voucher_date.
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '424':
+          description: Tally lookup or export failed; correct values or supply voucher_date then retry.
   /api/v1/sales/{requestId}/pdf:
     get:
       tags: [Sales Vouchers]

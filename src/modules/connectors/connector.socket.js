@@ -9,6 +9,14 @@ import { dispatchPendingSalesVoucherPdfs } from "../sales/sales-pdf.service.js";
 async function emitPendingSalesOrders(clientId, socket) {
   const requests = await findQueuedSalesOrders(clientId);
   for (const request of requests) {
+    if (request.transaction_type === "ledger_statement") {
+      socket.emit(SOCKET_EVENTS.ledgerStatementFetch, { request_id: request.request_id });
+      continue;
+    }
+    if (["sales_order_lookup", "sales_voucher_lookup"].includes(request.transaction_type)) {
+      socket.emit(SOCKET_EVENTS.salesOrderFetch, { request_id: request.request_id });
+      continue;
+    }
     const isSalesVoucher = request.transaction_type === "sales_voucher";
     const isReceiptVoucher = request.transaction_type === "receipt_voucher";
     const isPurchaseOrder = request.transaction_type === "purchase_order";

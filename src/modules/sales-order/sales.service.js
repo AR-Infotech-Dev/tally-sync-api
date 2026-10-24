@@ -4,6 +4,8 @@ import { createSalesOrderRequest, getSalesOrderRequest, updateSalesOrderRequest 
 import { recordConsoleLog } from "../console/consoleLog.store.js";
 
 function notifyConnector(request) {
+  if (request.transaction_type === "ledger_statement") return emitToConnector(request.client_id, SOCKET_EVENTS.ledgerStatementFetch, { request_id: request.request_id });
+  if (["sales_order_lookup", "sales_voucher_lookup"].includes(request.transaction_type)) return emitToConnector(request.client_id, SOCKET_EVENTS.salesOrderFetch, { request_id: request.request_id });
   const isSalesVoucher = request.transaction_type === "sales_voucher";
   const isReceiptVoucher = request.transaction_type === "receipt_voucher";
   const isPurchaseOrder = request.transaction_type === "purchase_order";

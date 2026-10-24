@@ -22,7 +22,7 @@ async function getCollection() {
 
 export async function getSalesPdf(clientId, requestId) {
   const collection = await getCollection();
-  return collection.findOne({ client_id: clientId, request_id: requestId });
+  return collection.findOne({ client_id: clientId, request_id: requestId, $or: [{ expires_at: { $exists: false } }, { expires_at: { $gt: new Date() } }] });
 }
 
 export async function findPendingSalesPdfs(clientId) {
@@ -32,18 +32,18 @@ export async function findPendingSalesPdfs(clientId) {
     .toArray();
 }
 
-export async function queueSalesPdf(clientId, requestId) {
+export async function queueSalesPdf(clientId, requestId, lookup) {
   const collection = await getCollection();
   const now = new Date();
   const current = await collection.findOne({ client_id: clientId, request_id: requestId });
-  if (current?.status === "ready" || current?.status === "queued" || current?.status === "generating") return current;
+  if ((!current?.expires_at || new Date(current.expires_at) > now) && ["ready", "queued", "generating"].includes(current?.status)) return current;
 
   await collection.updateOne(
     { client_id: clientId, request_id: requestId },
     {
-      $set: { status: "queued", updated_at: now, error: null },
+      $set: { status: "queued", updated_at: now, error: null, ...(lookup ? { lookup, expires_at: new Date(now.getTime() + RETENTION_DAYS * 86400000) } : {}) },
       $setOnInsert: { client_id: clientId, request_id: requestId, created_at: now },
-      $unset: { pdf: "", expires_at: "" },
+      $unset: { pdf: "", ...(!lookup ? { expires_at: "" } : {}) },
     },
     { upsert: true },
   );
