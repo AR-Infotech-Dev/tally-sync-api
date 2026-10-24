@@ -196,3 +196,13 @@ New accounts use this setup flow: register -> enter the emailed activation code 
 - The registration API still activates the existing account after email delivery; this change does not introduce a separate email-verification link or reset/key-rotation portal.
 
 Verification: `node --test test/*.test.js` in Server and Connector. The onboarding HTTP test uses a local Express endpoint with a synthetic activation repository; it does not send mail or alter production MongoDB. Desktop/mobile previews use synthetic data.
+
+## Automatic PDF browser setup
+
+`npm install` / `npm ci` now runs `pdf:install` automatically, and `npm start` verifies it again before opening the Server. The PDF service also installs a missing browser on demand. A compatible Chrome for Testing revision is selected from the installed Puppeteer version and cached in `.cache/pdf-browser`; concurrent requests share an installation. A failed installation can be retried. Installed system Chrome/Edge/Chromium is reused. An explicit `PDF_BROWSER_EXECUTABLE_PATH` remains authoritative; remove an invalid override to use automatic setup.
+
+For Docker, build using `Server/Dockerfile` with `Server` as the build context. It downloads Chrome and installs Debian libraries during the build using `PDF_BROWSER_INSTALL_DEPS=true`, then runs the app as the non-root `node` user. Pass application secrets as runtime environment variables; `.env` and browser caches are excluded from the build context. Use Node 22.12 or later, as required by the installed Puppeteer version. Chrome's sandbox must be supported by the container host; see https://pptr.dev/guides/docker and https://pptr.dev/troubleshooting for runtime sandbox configuration. The app does not disable the browser sandbox.
+
+On non-container Debian/Ubuntu servers, install system libraries during a root build with `PDF_BROWSER_INSTALL_DEPS=true npm ci`. Non-root startup can download the browser but cannot install OS packages. A writable browser cache and outbound access to Chrome downloads are needed when downloading; deployments without internet should include the prepared cache or an installed browser. `PDF_BROWSER_CACHE_DIR` can point to a persistent writable cache.
+
+This change requires deploying the updated Server or rebuilding its Docker image once. It cannot modify an already running remote container without deployment access. Subsequent deployments using this setup install the browser automatically.

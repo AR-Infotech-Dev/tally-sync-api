@@ -1,6 +1,7 @@
 import Handlebars from "handlebars";
 import puppeteer from "puppeteer-core";
-import { readFile, access } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import { resolvePdfBrowser } from './pdf-browser.service.js';
 import { createRequire } from "node:module";
 import path from "node:path";
 import { buildLedgerPdfData } from "./ledger-pdf.utils.js";
@@ -24,20 +25,9 @@ export async function renderLedgerStatementHtml(statement) {
   return handlebars.compile(template)({ ...buildLedgerPdfData(statement), latin_font: latin.toString("base64"), devanagari_font: devanagari.toString("base64") });
 }
 
-async function browserPath() {
-  const configured = process.env.PDF_BROWSER_EXECUTABLE_PATH;
-  const candidates = configured ? [configured] : process.platform === "win32" ? [
-    path.join(process.env["PROGRAMFILES(X86)"] || "C:/Program Files (x86)", "Microsoft/Edge/Application/msedge.exe"),
-    path.join(process.env.PROGRAMFILES || "C:/Program Files", "Microsoft/Edge/Application/msedge.exe"),
-    path.join(process.env.PROGRAMFILES || "C:/Program Files", "Google/Chrome/Application/chrome.exe"),
-  ] : ["/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome", "/usr/bin/microsoft-edge", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"];
-  for (const candidate of candidates) { try { await access(candidate); return candidate; } catch {} }
-  throw new Error("PDF browser is unavailable. Install Chrome/Chromium/Edge on Server and set PDF_BROWSER_EXECUTABLE_PATH to its executable.");
-}
-
 export async function generateLedgerStatementPdf(statement) {
   const [html, footer] = await Promise.all([renderLedgerStatementHtml(statement), readFile(new URL("../../templates/pdf-footer.hbs", import.meta.url), "utf8")]);
-  const browser = await puppeteer.launch({ executablePath: await browserPath(), headless: true, timeout: 30000 });
+  const browser = await puppeteer.launch({ executablePath: await resolvePdfBrowser(), headless: true, timeout: 30000 });
   try {
     const page = await browser.newPage();
     await page.setJavaScriptEnabled(false);
