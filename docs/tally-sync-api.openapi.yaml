@@ -1164,6 +1164,11 @@ components:
             voucher_type:
               type: string
               example: Sales Order
+            order_due_date:
+              type: string
+              format: date
+              description: Required unless every item specifies its own order_due_date; no automatic default.
+              example: '2026-11-07'
             voucher_number:
               type: string
             date:

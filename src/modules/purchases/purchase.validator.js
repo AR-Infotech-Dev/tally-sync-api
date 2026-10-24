@@ -1,3 +1,4 @@
+import {validateOrderDueDates} from '../../shared/utils/orderDueDate.js';
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
 function validDate(value) {
@@ -31,6 +32,7 @@ export function validatePurchaseRequest(body = {}, kind) {
   if (!validDate(voucher.date || voucher.voucher_date || voucher.order_date)) errors.push({ field: `${config.field}.date`, message: "A valid voucher date is required (YYYY-MM-DD, YYYYMMDD, or DD-MM-YYYY)." });
   if (!(voucher.party?.ledger_name || voucher.party_ledger || voucher.supplier_ledger || voucher.supplier_name)) errors.push({ field: `${config.field}.party.ledger_name`, message: "Supplier ledger name is required." });
   if (kind === "purchase_order" && !(voucher.order_number || voucher.purchase_order_number)) errors.push({ field: "purchase_order.order_number", message: "Purchase order number is required. This is the supplier-facing order reference, separate from voucher_number." });
+  if(kind === 'purchase_order') errors.push(...validateOrderDueDates(voucher,'purchase_order'));
   if (config.items) {
     const items = voucher.items || voucher.line_items || voucher.lineItems;
     if (!Array.isArray(items) || items.length === 0) errors.push({ field: `${config.field}.items`, message: `${config.label} must contain at least one item.` });

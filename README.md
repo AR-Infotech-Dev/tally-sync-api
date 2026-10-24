@@ -200,3 +200,7 @@ Verification: `node --test test/*.test.js` in Server and Connector. The onboardi
 ## PDF deployment
 
 Run `npm ci` and deploy the updated Server. The Dockerfile uses Node 22 and JavaScript dependencies only. Previous browser installer services, scripts, package hooks and browser environment options have been removed. The HTML template has been adapted for pdfmake-supported formatting; arbitrary browser CSS (flex/grid/stylesheets) is not supported.
+
+## Order allocation due dates
+
+Sales Orders and Purchase Orders require `order_due_date` in `YYYY-MM-DD` format on the order, or separately on every item. An item value overrides the order-level value. No due date is inferred from the voucher date. Missing or invalid values return field-level validation errors before a job is queued. The Connector serializes both `ORDERNO` and compound `ORDERDUEDATE` within each batch allocation; invoice payloads keep their existing behavior. Example: `"order_number": "6", "order_due_date": "2026-11-07"` (replace with the actual promised date). These fixes do not modify vouchers already held in Tally Import Exceptions. Validate one corrected order before retrying other held copies.

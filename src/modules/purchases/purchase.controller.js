@@ -20,7 +20,7 @@ export function pushPurchase(kind) {
     if (completion.disconnected) return;
     if (!completion.request) return failureResponse(res, { code: 2004, httpStatus: 404, message: `${current.label} request was not found while waiting for the Connector.` });
     if (completion.timedOut) return failureResponse(res, { code: 2011, httpStatus: 504, message: "The Connector has not returned a Tally result before the response timeout. The request remains queued or processing.", data: { request_id: completion.request.request_id, status: completion.request.status } });
-    if (completion.request.status === "failed") return failureResponse(res, { code: 2012, httpStatus: 502, message: `Tally did not accept the ${current.label}.`, data: { request_id: completion.request.request_id, status: completion.request.status, error: completion.request.error } });
+    if (completion.request.status === "failed") return failureResponse(res, { code: 2012, httpStatus: 502, message: `Tally did not accept the ${current.label}.`, data: { request_id: completion.request.request_id, status: completion.request.status, error: completion.request.error, ...(completion.request.tally_result ? { tally_result: completion.request.tally_result } : {}) } });
 
     const tallyResult = completion.request.tally_result || null;
     const submitted = completion.request[current.field]?.voucher_number || completion.request[current.field]?.order_number || null;
