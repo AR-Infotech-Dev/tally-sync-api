@@ -24,7 +24,8 @@
   <p class="ledger" style="text-align:center"><strong>{{ledger_name}}</strong><br>Ledger Account</p>
   <p style="text-align:center">{{period_from}} to {{period_to}}<br><span class="muted">{{format_label}}</span></p>
   {{#if is_stale}}<p class="stale">Cached data - latest Tally changes may not be included.</p>{{/if}}
-  {{#if bank_details_unavailable}}<p class="stale">Payment mode and bank details are not synced yet. Update the Connector and complete a sync.</p>{{/if}}
+  {{#if bank_details_unavailable}}<p class="stale">Payment mode and bank details are not synced yet. Update the
+    Connector and complete a sync.</p>{{/if}}
   {{#if details_unavailable}}<p class="stale">Detailed item and bill breakup is not synced yet. Update the Connector and
     complete a sync.</p>{{/if}}
   <table style="margin-top:6px;margin-bottom:8px"
@@ -49,17 +50,18 @@
         <td class="number">{{opening_credit}}</td>
       </tr>{{/if}}
       {{#each entries}}
-      <tr {{#if stripe}}data-pdfmake='{"fillColor":"#f1f5fa"}'{{/if}}>
-        <td {{#if stripe}}style="background-color:#f1f5fa"{{/if}}>{{display_date}}</td>
-        <td {{#if stripe}}style="background-color:#f1f5fa"{{/if}}>{{direction}} <strong>{{primary_particular}}</strong></td>
-        <td {{#if stripe}}style="background-color:#f1f5fa"{{/if}}>
+      <tr {{#if stripe}}data-pdfmake='{"fillColor":"#f1f5fa"}' {{/if}}>
+        <td {{#if stripe}}style="background-color:#f1f5fa" {{/if}}>{{display_date}}</td>
+        <td {{#if stripe}}style="background-color:#f1f5fa" {{/if}}>{{direction}} <strong>{{primary_particular}}</strong>
+        </td>
+        <td {{#if stripe}}style="background-color:#f1f5fa" {{/if}}>
           <strong>
             {{voucher_type}}
           </strong>
         </td>
-        {{#if @root.showVoucherNo}}<td {{#if stripe}}style="background-color:#f1f5fa"{{/if}}>{{voucher_no}}</td>{{/if}}
-        <td class="number" {{#if stripe}}style="background-color:#f1f5fa"{{/if}}>{{debit_display}}</td>
-        <td class="number" {{#if stripe}}style="background-color:#f1f5fa"{{/if}}>{{credit_display}}</td>
+        {{#if @root.showVoucherNo}}<td {{#if stripe}}style="background-color:#f1f5fa" {{/if}}>{{voucher_no}}</td>{{/if}}
+        <td class="number" {{#if stripe}}style="background-color:#f1f5fa" {{/if}}>{{debit_display}}</td>
+        <td class="number" {{#if stripe}}style="background-color:#f1f5fa" {{/if}}>{{credit_display}}</td>
       </tr>
 
       {{#if inventory_entries}}
@@ -117,8 +119,19 @@
         <td></td>
         <td></td>
       </tr>{{/if}}{{/if}}
-      {{#if payment_modes}}<tr><td></td><td colspan="{{@root.detail_colspan}}" class="narration">Mode of Payment/Receipt: {{payment_modes}}</td><td></td><td></td></tr>{{/if}}
-      {{#each bank_allocations}}<tr><td></td><td colspan="{{@root.detail_colspan}}" class="narration">Bank: {{bank_name}} {{instrument_number}} {{instrument_date}} {{status}}</td><td></td><td></td></tr>{{/each}}
+      {{#if payment_modes}}<tr>
+        <td></td>
+        <td colspan="{{@root.detail_colspan}}" class="narration">Mode of Payment/Receipt: {{payment_modes}}</td>
+        <td></td>
+        <td></td>
+      </tr>{{/if}}
+      {{#each bank_allocations}}<tr>
+        <td></td>
+        <td colspan="{{@root.detail_colspan}}" class="narration">Bank: {{bank_name}} {{instrument_number}}
+          {{instrument_date}} {{status}}</td>
+        <td></td>
+        <td></td>
+      </tr>{{/each}}
       {{else}}
       <tr>
         <td colspan="{{column_count}}" style="text-align:center;color:#69768a">No transactions in this period.</td>
