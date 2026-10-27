@@ -31,7 +31,7 @@ export const getIO = () => {
 export function listRegisteredConnectors() {
     if (!io) return [];
     return [...io.sockets.sockets.values()]
-        .filter((socket) => socket.data?.clientId && socket.data?.connectorId)
+        .filter((socket) => socket.connected && socket.data?.clientId && socket.data?.connectorId)
         .map((socket) => ({
             clientId: socket.data.clientId,
             connectorId: socket.data.connectorId,

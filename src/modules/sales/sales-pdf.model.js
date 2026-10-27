@@ -43,7 +43,7 @@ export async function queueSalesPdf(clientId, requestId, lookup) {
     {
       $set: { status: "queued", updated_at: now, error: null, ...(lookup ? { lookup, expires_at: new Date(now.getTime() + RETENTION_DAYS * 86400000) } : {}) },
       $setOnInsert: { client_id: clientId, request_id: requestId, created_at: now },
-      $unset: { pdf: "", ...(!lookup ? { expires_at: "" } : {}) },
+      $unset: { pdf: "", error_code: "", ...(!lookup ? { expires_at: "" } : {}) },
     },
     { upsert: true },
   );
@@ -80,16 +80,16 @@ export async function completeSalesPdf(clientId, requestId, pdf, filename = "sal
         updated_at: now,
         expires_at: expiresAt,
       },
-      $unset: { error: "" },
+      $unset: { error: "", error_code: "" },
     },
   );
 }
 
-export async function failSalesPdf(clientId, requestId, error) {
+export async function failSalesPdf(clientId, requestId, error, errorCode) {
   const collection = await getCollection();
   const now = new Date();
   await collection.updateOne(
     { client_id: clientId, request_id: requestId },
-    { $set: { status: "failed", error: String(error || "PDF export failed").slice(0, 2000), updated_at: now, expires_at: new Date(now.getTime() + RETENTION_DAYS * 24 * 60 * 60 * 1000) } },
+    { $set: { status: "failed", error: String(error || "PDF export failed").slice(0, 2000), ...(errorCode ? { error_code: errorCode } : {}), updated_at: now, expires_at: new Date(now.getTime() + RETENTION_DAYS * 24 * 60 * 60 * 1000) } },
   );
 }

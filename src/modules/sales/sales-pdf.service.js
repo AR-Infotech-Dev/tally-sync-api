@@ -4,6 +4,7 @@ import { getSalesPdf, queueSalesPdf, findPendingSalesPdfs } from "./sales-pdf.mo
 import { readSalesVoucher } from "./sales.service.js";
 import { recordConsoleLog } from "../console/consoleLog.store.js";
 import { createHash } from "node:crypto";
+import { assertConnectorAvailable } from "../connectors/connectorAvailability.service.js";
 
 export async function requestSalesVoucherPdfByNumber(clientId, company, voucherNumber, options) {
   const lookup = { company, ledger_name: options.partyLedger, voucher_no: voucherNumber, ...(options.voucherDate ? { voucher_date: options.voucherDate } : {}) };
@@ -12,6 +13,7 @@ export async function requestSalesVoucherPdfByNumber(clientId, company, voucherN
   const existing = await getSalesPdf(clientId, requestId);
   if (existing?.status === "ready") return { pdf: existing, requestId };
   if (existing?.status === "failed" && !options.retry) return { job: existing, requestId };
+  await assertConnectorAvailable(clientId);
   const job = await queueSalesPdf(clientId, requestId, lookup);
   const connectorNotified = job.status === "queued"
     ? emitToConnector(clientId, SOCKET_EVENTS.salesVoucherPdfExport, { request_id: requestId }) : false;
@@ -28,6 +30,7 @@ export async function requestSalesVoucherPdf(clientId, requestId, { retry = fals
   if (existing?.status === "ready") return { pdf: existing };
   if (existing?.status === "failed" && !retry) return { job: existing, connectorNotified: false };
 
+  await assertConnectorAvailable(clientId);
   const job = await queueSalesPdf(clientId, requestId);
   const connectorNotified = job.status === "queued"
     ? emitToConnector(clientId, SOCKET_EVENTS.salesVoucherPdfExport, { request_id: requestId })

@@ -57,6 +57,6 @@ test('Connector real HTTP client exchanges a code; API rejects malformed/reused 
   assert.equal(response.status,401);assert.equal(response.headers.get('cache-control'),'no-store');assert.equal((await response.json()).success,false);
 });
 
-test('Remote activation requires HTTPS before sending a secret', () => {
-  assert.throws(()=>activateConnectorRequest('http://example.com','synthetic'),/HTTPS/);
+test('Remote activation requires HTTPS before sending a secret', async () => {
+  await assert.rejects(activateConnectorRequest('http://example.com','synthetic'),/HTTPS/);
 });

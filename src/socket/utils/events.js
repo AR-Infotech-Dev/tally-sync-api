@@ -5,6 +5,7 @@ export const SOCKET_EVENTS = Object.freeze({
   connectorHeartbeatAck: "connector:heartbeat:ack",
   connectorAck: "connector:ack",
   connectorTest: "connector:test",
+  connectorTallyCheck: "connector:tally:check",
   salesOrderPush: "sales-order:push",
   salesOrderFetch: "sales-order:fetch",
   ledgerStatementFetch: "ledger-statement:fetch",

@@ -48,6 +48,9 @@ export const failureMessages = {
   2007: "Permission denied",
   2008: "Something went wrong",
   2009: "Session expired",
+  2013: "Connector is not connected.",
+  2014: "Tally is not connected.",
+  2015: "Connection check timed out.",
 };
 
 // ===============================

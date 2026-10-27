@@ -204,3 +204,23 @@ Run `npm ci` and deploy the updated Server. The Dockerfile uses Node 22 and Java
 ## Order allocation due dates
 
 Sales Orders and Purchase Orders require `order_due_date` in `YYYY-MM-DD` format on the order, or separately on every item. An item value overrides the order-level value. No due date is inferred from the voucher date. Missing or invalid values return field-level validation errors before a job is queued. The Connector serializes both `ORDERNO` and compound `ORDERDUEDATE` within each batch allocation; invoice payloads keep their existing behavior. Example: `"order_number": "6", "order_due_date": "2026-11-07"` (replace with the actual promised date). These fixes do not modify vouchers already held in Tally Import Exceptions. Validate one corrected order before retrying other held copies.
+
+## Connector and Tally availability
+
+New live voucher pushes, direct Tally voucher lookups and uncached Sales PDF exports perform a read-only connection preflight before queueing work.
+
+- HTTP 503, code 2013, error_code CONNECTOR_NOT_CONNECTED: this client's registered Connector is offline. No new job is created.
+- HTTP 503, code 2014, error_code TALLY_NOT_CONNECTED: Connector is online but cannot reach Tally. No new job is created.
+- HTTP 504, code 2015: TALLY_TIMEOUT or CONNECTOR_CHECK_TIMEOUT identifies an unresponsive Tally or Connector.
+
+The normal success/false response envelope is retained. CONNECTOR_HEALTH_TIMEOUT_MS defaults to 5000 milliseconds; it is separate from the terminal job response timeout. Deploy the updated Server and restart/update the Connector together so it can answer connector:tally:check.
+
+Ledger statements still need a connected Connector, but read its local SQLite snapshot without requiring running Tally. Already cached PDF files and stored job-status endpoints do not require a live Tally connection. A Connector disconnect after work was accepted returns the request_id and its current status; it does not delete accepted work. Tally connection failures after preflight propagate through persisted job/PDF metadata instead of becoming generic voucher-validation failures.
+
+Live voucher push/GET and ledger statement routes also mount requireConnectedConnector after requireClientApiKey. It matches authenticated req.client.client_id against registered sockets whose connected flag is true, returning HTTP 503/code 2013 before the controller when absent. Stored status reads remain accessible offline; PDF cache-aware services retain their existing availability checks.
+
+### Fast Connector liveness and cached statement timeout
+
+The connection middleware now performs a Connector-only ACK probe after client authentication, rather than relying solely on the registered socket list. No registered socket returns CONNECTOR_NOT_CONNECTED immediately; a registered socket that fails its ACK returns HTTP 503/code 2013/error_code CONNECTOR_NOT_RESPONDING. CONNECTOR_PING_TIMEOUT_MS defaults to 1500ms and is separate from the 5000ms Tally probe. This is the probe budget, not an end-to-end HTTP response SLA: authentication/database/network latency precedes it.
+
+POST /ledgers/statement and POST /ledgers/statement/pdf wait up to LEDGER_RESPONSE_TIMEOUT_MS (default 15000ms) for the local statement job rather than using the generic 120-second voucher timeout. PDF rendering starts after the statement is returned and is outside that job-wait budget. Connector-only probes acknowledge without contacting Tally, preserving offline-Tally cached statement reads. Update both Server and Connector for the liveness protocol. Closing the Connector window can leave its tray service running; use tray Quit to stop the process.

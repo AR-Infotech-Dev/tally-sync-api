@@ -5,6 +5,7 @@ import { waitForSalesOrderCompletion } from "../sales-order/sales.service.js";
 import { validateSalesVoucherRequest, validateSalesPdfLookup } from "./sales.validator.js";
 import { completeSalesPdf, failSalesPdf, markSalesPdfGenerating, readSalesPdf } from "./sales-pdf.model.js";
 import { requestSalesVoucherPdf, requestSalesVoucherPdfByNumber } from "./sales-pdf.service.js";
+import { assertNoAvailabilityFailure } from "../connectors/connectorAvailability.service.js";
 
 export const pushSalesVoucher = asyncHandler(async (req, res) => {
   const errors = validateSalesVoucherRequest(req.body);
@@ -87,6 +88,7 @@ function sendSalesVoucherPdf(res, result, requestId) {
     const content = Buffer.isBuffer(result.pdf.pdf) ? result.pdf.pdf : result.pdf.pdf?.value?.(true) || result.pdf.pdf?.buffer;
     return res.status(200).send(content);
   }
+  assertNoAvailabilityFailure({ ...result.job, tally_result: { error_code: result.job?.error_code } });
   if (result.job?.status === "failed") return failureResponse(res, { code: 2010, httpStatus: 424, message: `Sales Voucher PDF export failed: ${result.job.error || "Unknown export error."} Retry with ?retry=true after fixing the Connector/Tally issue.` });
   return successResponse(res, {
     code: 1002,
@@ -119,7 +121,10 @@ export const updateSalesVoucherPdfStatus = asyncHandler(async (req, res) => {
   }
   if (!pdfJob || !["queued", "generating"].includes(pdfJob.status)) return failureResponse(res, { code: 2009, httpStatus: 409, message: "No active PDF export request exists for this Sales Voucher." });
   if (req.body?.status === "generating") await markSalesPdfGenerating(req.client.client_id, req.params.requestId);
-  else if (req.body?.status === "failed") await failSalesPdf(req.client.client_id, req.params.requestId, req.body.error);
+  else if (req.body?.status === "failed") {
+    if (req.body.error_code && !["TALLY_NOT_CONNECTED", "TALLY_TIMEOUT"].includes(req.body.error_code)) return failureResponse(res, { code: 2001, httpStatus: 400, message: "Invalid PDF failure code." });
+    await failSalesPdf(req.client.client_id, req.params.requestId, req.body.error, req.body.error_code);
+  }
   else return failureResponse(res, { code: 2001, httpStatus: 400, message: "Status must be generating or failed." });
   return successResponse(res, { code: 1000, httpStatus: 200, message: "Sales Voucher PDF status updated.", data: { request_id: req.params.requestId, pdf_status: req.body.status } });
 });

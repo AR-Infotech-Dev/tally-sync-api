@@ -1,4 +1,7 @@
+import { failureResponse } from "../shared/utils/apiResponse.js";
+
 export function errorHandler(error, req, res, next) {
+  if (error.apiCode) return failureResponse(res, { code: error.apiCode, httpStatus: error.status || 500, message: error.message, data: error.data });
   const status = error.status || 500;
   const payload = {
     flag: "F",

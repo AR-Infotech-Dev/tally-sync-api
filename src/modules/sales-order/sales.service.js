@@ -2,6 +2,7 @@ import { emitToConnector } from "../../socket/index.js";
 import { SOCKET_EVENTS } from "../../socket/utils/events.js";
 import { createSalesOrderRequest, getSalesOrderRequest, updateSalesOrderRequest } from "./sales.model.js";
 import { recordConsoleLog } from "../console/consoleLog.store.js";
+import { assertConnectorAvailable, assertConnectorConnected, assertNoAvailabilityFailure } from "../connectors/connectorAvailability.service.js";
 
 function notifyConnector(request) {
   if (request.transaction_type === "ledger_statement") return emitToConnector(request.client_id, SOCKET_EVENTS.ledgerStatementFetch, { request_id: request.request_id });
@@ -26,6 +27,7 @@ function notifyConnector(request) {
 }
 
 export async function queueSalesOrder(input) {
+  await assertConnectorAvailable(input.client_id, { requireTally: input.transaction_type !== "ledger_statement" });
   const result = await createSalesOrderRequest(input);
   const connectorNotified = result.request.status === "queued" ? notifyConnector(result.request) : false;
   const transactionLabel = result.request.transaction_type === "receipt_voucher"
@@ -65,12 +67,16 @@ export async function waitForSalesOrderCompletion(clientId, requestId, {
     if (shouldStop()) return { request, disconnected: true };
     request = await getSalesOrderRequest(clientId, requestId);
     if (!request || request.status === "succeeded" || request.status === "failed") {
+      assertNoAvailabilityFailure(request);
       return { request, timedOut: false };
     }
+    assertConnectorConnected(clientId, { request_id: requestId, status: request.status });
     await new Promise((resolve) => setTimeout(resolve, Math.min(pollIntervalMs, Math.max(0, deadline - Date.now()))));
   }
 
   request = await getSalesOrderRequest(clientId, requestId);
+  assertNoAvailabilityFailure(request);
+  if (request && !["succeeded", "failed"].includes(request.status)) assertConnectorConnected(clientId, { request_id: requestId, status: request.status });
   return { request, timedOut: !request || !["succeeded", "failed"].includes(request.status) };
 }
 
