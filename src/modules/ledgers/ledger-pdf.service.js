@@ -20,6 +20,12 @@ const fonts = (subset) => {
 pdfmake.addFonts({Statement:fonts('latin'), StatementDevanagari:fonts('devanagari')});
 pdfmake.setUrlAccessPolicy(() => false);
 pdfmake.setLocalAccessPolicy((file) => fontFiles.has(path.resolve(file)));
+pdfmake.addTableLayouts({ ledgerStatement: {
+  defaultBorder: false,
+  hLineWidth: (index, node) => index <= 1 || index >= node.table.body.length - 3 ? 0.5 : 0,
+  vLineWidth: () => 0,
+  paddingLeft: () => 2, paddingRight: () => 2, paddingTop: () => 2, paddingBottom: () => 2,
+} });
 const handlebars=Handlebars.create();
 
 export function ledgerPdfFilename(statement) {
@@ -27,9 +33,9 @@ export function ledgerPdfFilename(statement) {
   return `statement-${ledger}-${statement.from_date}-${statement.to_date}.pdf`;
 }
 
-export async function renderLedgerStatementHtml(statement) {
+export async function renderLedgerStatementHtml(statement, options = {}) {
   const template=await readFile(new URL('../../templates/ledger-statement.hbs', import.meta.url),'utf8');
-  return handlebars.compile(template)(buildLedgerPdfData(statement));
+  return handlebars.compile(template)(buildLedgerPdfData(statement, options));
 }
 
 function convertHtml(html) {
@@ -38,14 +44,14 @@ function convertHtml(html) {
   try {
     return applyStatementFonts(htmlToPdfmake(html, {
       window, removeExtraBlanks:true,
-      defaultStyles:{p:{margin:[0,0,0,5]},h1:{fontSize:19,margin:[0,0,0,4]},h2:{fontSize:10,color:'#2862d7',margin:[0,0,0,10]},th:{bold:true,fillColor:'#eaf0f8'},table:{margin:[0,6,0,8]}},
+      defaultStyles:{p:{margin:[0,0,0,2]},h1:{fontSize:14,margin:[0,0,0,4]},h2:{fontSize:10,margin:[0,0,0,10]},th:{bold:true,fillColor:'#ffffff'},table:{margin:[0,0,0,0],marginBottom:0}},
     }));
   } finally {window.close();}
 }
 
-export async function buildLedgerPdfDefinition(statement) {
+export async function buildLedgerPdfDefinition(statement, options = {}) {
   const [html,footer]=await Promise.all([
-    renderLedgerStatementHtml(statement),
+    renderLedgerStatementHtml(statement, options),
     readFile(new URL('../../templates/pdf-footer.hbs',import.meta.url),'utf8'),
   ]);
   const renderFooter=handlebars.compile(footer);
@@ -59,6 +65,6 @@ export async function buildLedgerPdfDefinition(statement) {
   };
 }
 
-export async function generateLedgerStatementPdf(statement) {
-  return Buffer.from(await pdfmake.createPdf(await buildLedgerPdfDefinition(statement)).getBuffer());
+export async function generateLedgerStatementPdf(statement, options = {}) {
+  return Buffer.from(await pdfmake.createPdf(await buildLedgerPdfDefinition(statement, options)).getBuffer());
 }

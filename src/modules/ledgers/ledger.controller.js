@@ -15,7 +15,7 @@ const statementHandler = (pdf = false) => asyncHandler(async (req, res) => {
   const statement = result.request.tally_result?.statement;
   if (!statement) return failureResponse(res, { code: 2012, httpStatus: 502, message: "Connector returned no ledger statement." });
   if (pdf || req.query.format === "pdf") {
-    const content = await generateLedgerStatementPdf(statement);
+    const content = await generateLedgerStatementPdf(statement, req.body);
     if (res.destroyed) return;
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${ledgerPdfFilename(statement)}"`, "Cache-Control": "no-store" });
     return res.status(200).send(content);

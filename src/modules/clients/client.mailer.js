@@ -1,5 +1,14 @@
 import nodemailer from "nodemailer";
-import { buildCredentialsEmail } from "./client-credentials.utils.js";
+import { renderClientCredentialsEmail } from "./client-email.template.js";
+
+export function buildClientCredentialsMessage(input, from) {
+  return {
+    from,
+    to: input.email,
+    subject: "Your Tally Sync Connector credentials",
+    ...renderClientCredentialsEmail(input),
+  };
+}
 
 export async function sendClientCredentialsEmail({ email, name, clientId, connectorId, apiKey, connectorKey, activationCode }) {
   const { EMAIL_USER, EMAIL_PASS } = process.env;
@@ -14,10 +23,5 @@ export async function sendClientCredentialsEmail({ email, name, clientId, connec
     auth: { user: EMAIL_USER, pass: EMAIL_PASS },
   });
 
-  await transporter.sendMail({
-    from: EMAIL_USER,
-    to: email,
-    subject: "Your Tally Sync Connector credentials",
-    text: buildCredentialsEmail({name, clientId, connectorId, apiKey, connectorKey, activationCode}),
-  });
+  await transporter.sendMail(buildClientCredentialsMessage({ email, name, clientId, connectorId, apiKey, connectorKey, activationCode }, EMAIL_USER));
 }

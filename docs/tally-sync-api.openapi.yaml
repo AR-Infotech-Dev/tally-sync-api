@@ -77,6 +77,7 @@ paths:
         Uses the same company, ledger_name, from_date and to_date body as the JSON
         statement endpoint. Returns a downloadable PDF with repeated headers, period
         balances, transactions and freshness metadata. No extra Tally export occurs.
+        Use is_detailed: "no" (default) for condensed voucher rows or "yes" for item quantity/rate/amount and bill-reference breakup from the synced cache.
         Errors remain JSON. PDF bytes are generated in memory and are not persisted.
       requestBody:
         $ref: '#/paths/~1api~1v1~1ledgers~1statement/post/requestBody'
@@ -145,11 +146,42 @@ paths:
                 to_date:
                   type: string
                   format: date
+                report_format:
+                  type: string
+                  enum: [condensed, detailed]
+                  description: Overrides is_detailed format; individual show flags override format defaults.
+                show_narrations:
+                  type: string
+                  enum: ['yes', 'no']
+                show_voucher_no:
+                  type: string
+                  enum: ['yes', 'no']
+                show_bill_wise_details:
+                  type: string
+                  enum: ['yes', 'no']
+                show_inventory_details:
+                  type: string
+                  enum: ['yes', 'no']
+                show_payment_receipt_mode:
+                  type: string
+                  enum: ['yes', 'no']
+                show_bank_details:
+                  type: string
+                  enum: ['yes', 'no']
+                enable_stripe_view:
+                  type: string
+                  enum: ['yes', 'no']
+                is_detailed:
+                  type: string
+                  enum: ['yes', 'no']
+                  default: 'no'
+                  description: PDF presentation only. Detailed includes cached inventory and bill allocations; condensed keeps voucher rows.
             example:
               company: Sai Enterprises
               ledger_name: Anjan Ambare
               from_date: '2026-10-01'
               to_date: '2026-10-31'
+              is_detailed: 'yes'
       responses:
         '200':
           description: Normalized statement; no activity returns an empty entries array.

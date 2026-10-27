@@ -224,3 +224,23 @@ Live voucher push/GET and ledger statement routes also mount requireConnectedCon
 The connection middleware now performs a Connector-only ACK probe after client authentication, rather than relying solely on the registered socket list. No registered socket returns CONNECTOR_NOT_CONNECTED immediately; a registered socket that fails its ACK returns HTTP 503/code 2013/error_code CONNECTOR_NOT_RESPONDING. CONNECTOR_PING_TIMEOUT_MS defaults to 1500ms and is separate from the 5000ms Tally probe. This is the probe budget, not an end-to-end HTTP response SLA: authentication/database/network latency precedes it.
 
 POST /ledgers/statement and POST /ledgers/statement/pdf wait up to LEDGER_RESPONSE_TIMEOUT_MS (default 15000ms) for the local statement job rather than using the generic 120-second voucher timeout. PDF rendering starts after the statement is returned and is outside that job-wait budget. Connector-only probes acknowledge without contacting Tally, preserving offline-Tally cached statement reads. Update both Server and Connector for the liveness protocol. Closing the Connector window can leave its tray service running; use tray Quit to stop the process.
+
+## Ledger PDF format selection
+
+POST /api/v1/ledgers/statement/pdf (or /api/v1/ledgers/statement?format=pdf) accepts is_detailed as the string "yes" or "no". Default: "no". Invalid values return a validation error for is_detailed.
+
+- "no": Tally-style condensed ledger rows with Date, Particulars, Vch Type, Vch No., Debit and Credit, opening/closing balances and balancing totals.
+- "yes": same movements and balances, plus cached stock item, quantity, rate, amount, ledger-specific bill type/reference/amount/direction, and available narration.
+
+The PDF is rendered by our Handlebars/pdfmake templates; it is not Tally's native PDF file. Company address/email appear when present in the cache. Item and bill breakup never contributes a second time to the ledger totals. The JSON endpoint keeps the normalized statement and now includes cached inventory_entries, bill_allocations, company_details and details_available. is_detailed affects PDF presentation only.
+
+Update the Connector and complete the next sync once to backfill historical detail data. SQLite upgrades in place without deletion; the versioned manifest refreshes existing vouchers once. If details are not yet synced, a detailed PDF explicitly says so. No extra Tally export is performed per PDF request.
+
+Credentials emails render HTML from `src/templates/client-credentials.hbs` and a plain-text fallback from `src/templates/client-credentials.text.hbs`. The client email renderer supplies registration credentials without returning them in the registration API response. Templates are compiled once per process; restart the Server after changing a template. Credentials use selectable text because email clients do not support JavaScript clipboard actions.
+
+### Ledger PDF export configuration
+POST /api/v1/ledgers/statement/pdf accepts report_format ("condensed"/"detailed"), show_narrations, show_voucher_no, show_bill_wise_details, show_inventory_details, show_payment_receipt_mode, show_bank_details and enable_stripe_view ("yes"/"no").
+Individual flags override the format defaults. Existing is_detailed remains supported; report_format takes precedence.
+Voucher numbers default to yes. Narration, bills and inventory default to the selected format; mode, bank and stripes default to no.
+The response remains a PDF download. Local drive/folder selection belongs to the downloading client, not the server.
+Update/restart both Server and Connector and complete a sync for bank allocation metadata. Existing SQLite data is preserved; versioned signatures trigger one backfill. Bank status is displayed only when Tally exports it; no status is inferred.
