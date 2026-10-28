@@ -1,0 +1,3079 @@
+openapi: 3.0.3
+info:
+  title: Flowups Tally Sync API
+  version: 1.0.0
+  description: >-
+    REST API for onboarding CRM clients, importing Sales Orders, Sales Vouchers, Receipts, Purchase Orders,
+    Purchases and Payments, reading vouchers and cached ledger statements, and downloading PDFs. Voucher
+    pushes queue work internally but wait for a final Connector result: HTTP 200 succeeds, 502 rejects, and
+    504 returns request_id when the wait expires. Only pending Sales PDF exports use HTTP 202 polling.
+    Application authentication uses X-Client-ID plus X-API-Key; Connector-only calls use X-Client-ID plus
+    X-Connector-Key. JSON result properties appear at the top level unless explicitly documented as
+    data/statement. Examples use fictional placeholders and require matching Tally masters.
+servers:
+  - url: http://localhost:3000
+    description: Local Server
+  - url: https://sync.flowups.in
+    description: Production Server
+tags:
+  - name: Health
+  - name: Client Registration
+  - name: Sales Orders
+  - name: Sales Vouchers
+  - name: Receipt Vouchers
+  - name: Purchase Orders
+  - name: Purchase Vouchers
+  - name: Payment Vouchers
+  - name: Ledger Statements
+  - name: Admin Console
+    description: Administrative session endpoints, separate from CRM API keys.
+paths:
+  /api/v1/clients/activate-connector:
+    post:
+      tags:
+        - Client Registration
+      summary: Exchange a one-time emailed activation code for Connector credentials
+      operationId: activateConnector
+      security: []
+      description: >-
+        Code expires 24 hours after registration and is consumed atomically once. Returns Connector
+        credentials only; never returns the application API key. Use HTTPS remotely. On failure or a lost
+        response, use manual Connector credentials from the registration email. Limited to 10 attempts per 15
+        minutes. Existing application authentication remains X-Client-ID plus X-API-Key; the API key is the
+        secret and no separate API Secret is required.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - activation_code
+              properties:
+                activation_code:
+                  type: string
+                  pattern: ^[A-Za-z0-9_-]{43}$
+            example:
+              activation_code: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      responses:
+        '200':
+          description: Connector credentials; response has Cache-Control no-store.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  code:
+                    type: integer
+                  type:
+                    type: string
+                  message:
+                    type: string
+                  client_id:
+                    type: string
+                  connector_id:
+                    type: string
+                  connector_key:
+                    type: string
+                    description: Secret for Connector use only
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Connector activated. Continue with Tally setup.
+                client_id: CLIENT_DEMO0000000001
+                connector_id: CONNECTOR_DEMO0000000001
+                connector_key: YOUR_CONNECTOR_KEY
+        '400':
+          description: Missing or malformed activation code.
+        '401':
+          description: Invalid, expired or previously used activation code.
+        '429':
+          description: Too many activation attempts.
+      x-audience: public
+  /api/v1/ledgers/statement/pdf:
+    post:
+      tags:
+        - Ledger Statements
+      summary: Generate a PDF ledger statement from the local synced snapshot
+      operationId: getLedgerStatementPdf
+      security:
+        - clientId: []
+          clientApiKey: []
+      description: >-
+        Uses the same company, ledger_name, from_date and to_date body as the JSON statement endpoint. Returns
+        a downloadable PDF with repeated headers, period balances, transactions and freshness metadata. No
+        extra Tally export occurs. Use is_detailed: "no" (default) for condensed voucher rows or "yes" for
+        item quantity/rate/amount and bill-reference breakup from the synced cache. Errors remain JSON. PDF
+        bytes are generated in memory and are not persisted. Rendered by the API from cached data; this is not
+        a native Tally PDF export. report_format overrides is_detailed; individual show flags override format
+        defaults. Voucher numbers default to yes. Narrations, bills and inventory follow selected format;
+        payment mode, bank details and stripes default to no. Missing cache details are indicated explicitly.
+        Requires responsive Connector; Tally may be offline after initial sync.
+      requestBody:
+        $ref: '#/paths/~1api~1v1~1ledgers~1statement/post/requestBody'
+      responses:
+        '200':
+          description: Ledger statement PDF ready for preview or saving.
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              example: attachment; filename="statement-Anjan_Ambare-2026-10-01-2026-10-31.pdf"
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          description: Ledger or statement job not found.
+        '503':
+          description: >-
+            Connector offline/unresponsive, or initial local cache sync is incomplete. Tally need not be
+            running after a usable cache exists.
+        '504':
+          description: Connector response timed out.
+      x-audience: application
+  /api/v1/ledgers/statement:
+    post:
+      tags:
+        - Ledger Statements
+      summary: Read a normalized ledger statement from the Connector SQLite cache
+      operationId: getLedgerStatement
+      parameters:
+        - name: format
+          in: query
+          description: Set pdf for PDF bytes; omit for the existing JSON response.
+          schema:
+            type: string
+            enum:
+              - json
+              - pdf
+      description: >-
+        Date range is inclusive. Company defaults to Connector settings if omitted. Returns normalized
+        base-currency entries, debit/credit totals, opening and closing balances. Opening includes posted
+        movements before from_date. Connector performs initial and three-minute background Tally syncs. This
+        API never queries Tally directly. Requires a running Connector and a completed local snapshot; returns
+        503 while the cache is uninitialized. Tally can be offline after initial sync; stale data is
+        explicitly marked. Uses the existing asynchronous job flow while the HTTP request waits. Default
+        Connector job wait is 15 seconds; PDF rendering is outside that budget. Dates must be real YYYY-MM-DD
+        dates from 1900-01-01 through 2099-12-31, with to_date on or after from_date. Connector must remain
+        responsive even when Tally is offline.
+      security:
+        - clientId: []
+          clientApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ledger_name
+                - from_date
+                - to_date
+              properties:
+                company:
+                  type: string
+                ledger_name:
+                  type: string
+                from_date:
+                  type: string
+                  format: date
+                to_date:
+                  type: string
+                  format: date
+                report_format:
+                  type: string
+                  enum:
+                    - condensed
+                    - detailed
+                  description: Overrides is_detailed format; individual show flags override format defaults.
+                show_narrations:
+                  type: string
+                  enum:
+                    - 'yes'
+                    - 'no'
+                show_voucher_no:
+                  type: string
+                  enum:
+                    - 'yes'
+                    - 'no'
+                show_bill_wise_details:
+                  type: string
+                  enum:
+                    - 'yes'
+                    - 'no'
+                show_inventory_details:
+                  type: string
+                  enum:
+                    - 'yes'
+                    - 'no'
+                show_payment_receipt_mode:
+                  type: string
+                  enum:
+                    - 'yes'
+                    - 'no'
+                show_bank_details:
+                  type: string
+                  enum:
+                    - 'yes'
+                    - 'no'
+                enable_stripe_view:
+                  type: string
+                  enum:
+                    - 'yes'
+                    - 'no'
+                is_detailed:
+                  type: string
+                  enum:
+                    - 'yes'
+                    - 'no'
+                  default: 'no'
+                  description: >-
+                    PDF presentation only. Detailed includes cached inventory and bill allocations; condensed
+                    keeps voucher rows.
+            example:
+              company: Demo Company
+              ledger_name: Demo Customer
+              from_date: '2026-10-01'
+              to_date: '2026-10-31'
+              report_format: detailed
+              show_voucher_no: 'yes'
+              show_narrations: 'yes'
+      responses:
+        '200':
+          description: Normalized statement; no activity returns an empty entries array.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Ledger statement retrieved from local synced database.
+                data:
+                  company: Demo Company
+                  ledger_name: Demo Customer
+                  from_date: '2026-10-01'
+                  to_date: '2026-10-31'
+                  opening_balance:
+                    amount: 0
+                    type: null
+                  entries:
+                    - date: '2026-10-31'
+                      voucher_no: '44'
+                      voucher_type: Sales New
+                      master_id: '123'
+                      narration: ''
+                      particulars:
+                        - Sales
+                      debit: 250
+                      credit: 0
+                      balance:
+                        amount: 250
+                        type: Dr
+                  total_debit: 250
+                  total_credit: 0
+                  closing_balance:
+                    amount: 250
+                    type: Dr
+                  source: local_sqlite
+                  last_synced_at: '2026-10-23T10:00:00.000Z'
+                  sync_status: ready
+                  is_stale: false
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  code:
+                    type: integer
+                  type:
+                    type: string
+                    description: HTTP status label such as OK, CREATED, BAD_REQUEST or GATEWAY_TIMEOUT.
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/LedgerStatement'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          description: Ledger not found in the selected company.
+        '502':
+          description: Connector or local statement read failed.
+        '503':
+          description: >-
+            Connector is offline/unresponsive, or the local cache has not completed initial sync. error_code
+            is present for Connector availability failures.
+        '504':
+          description: Connector response timed out; request_id can be used at the status endpoint.
+      x-audience: application
+  /api/v1/ledgers/{requestId}/status:
+    get:
+      tags:
+        - Ledger Statements
+      operationId: getLedgerStatementStatus
+      summary: Read a ledger statement job status and completed result
+      security:
+        - clientId: []
+          clientApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Stored ledger job status/result.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Success
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                status: succeeded
+                statement:
+                  company: Demo Company
+                  ledger_name: Demo Customer
+                  from_date: '2026-10-01'
+                  to_date: '2026-10-31'
+                  opening_balance:
+                    amount: 0
+                    type: null
+                  entries: []
+                  total_debit: 0
+                  total_credit: 0
+                  closing_balance:
+                    amount: 0
+                    type: null
+                  source: local_sqlite
+                  last_synced_at: '2026-10-28T08:00:00.000Z'
+                  sync_status: ready
+                  is_stale: false
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      description: >-
+        Reads the saved ledger job without contacting Tally. Successful result is in statement; failed result
+        can contain error. Works while Connector/Tally are offline.
+      x-audience: application
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Check Server health
+      operationId: getHealth
+      responses:
+        '200':
+          description: Server is running.
+          content:
+            application/json:
+              example:
+                status: ok
+                app: Flowups - Tally Sync API
+                legacyRoot: /
+                migratedControllers:
+                  - login
+      security: []
+      x-audience: public
+  /api/v1/clients/register:
+    post:
+      tags:
+        - Client Registration
+      summary: Register a CRM client and Tally Connector
+      operationId: registerClient
+      description: >-
+        Registers a client using its Tally license number. The API key and Connector credentials are emailed
+        to the submitted address; they are not returned in the response. Registration is rate-limited to five
+        requests per hour per source. JSON returns no API/Connector keys. Keys are emailed. Tally license
+        numbers must be unique. Application API key is the application secret; no additional API Secret is
+        required.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientRegistration'
+            example:
+              name: Demo User
+              company_name: Demo Company
+              email: developer@example.com
+              tally_license_no: DEMO-LICENSE-001
+      responses:
+        '201':
+          description: Client registered; credentials emailed.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1001
+                type: CREATED
+                message: Client registered. Credentials were sent to the registered email address.
+                client_id: CLIENT_DEMO0000000001
+                connector_id: CONNECTOR_DEMO0000000001
+                email: developer@example.com
+                credentials_emailed: true
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          description: Tally license number is already registered.
+          content:
+            application/json:
+              example:
+                success: false
+                code: 2000
+                type: CONFLICT
+                message: This Tally license number is already registered.
+        '429':
+          description: 'Registration rate limit exceeded: 5 attempts per hour for the source/email bucket.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security: []
+      x-audience: public
+  /api/v1/sales-orders/push:
+    post:
+      tags:
+        - Sales Orders
+      summary: Create a Sales Order in Tally and wait for the result
+      operationId: pushSalesOrder
+      description: >-
+        The Server queues the job and keeps this HTTP request open for the final Connector/Tally result
+        (default 120 seconds). HTTP 200 confirms succeeded; HTTP 502 means Tally rejected it; HTTP 504 returns
+        request_id when the wait expires, and the stored job may still finish. Read saved status before
+        retrying. New imports require a responsive Connector and running Tally. Reuse idempotency_key only for
+        the same transaction/payload. A completed duplicate returns duplicate: true. The company configured in
+        Connector settings takes precedence over destination.company. Every order item requires order_due_date
+        on the item or inherited from the order.
+      security:
+        - clientId: []
+          clientApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SalesOrderPush'
+            example:
+              idempotency_key: CRM-SALES_ORDER-1001
+              destination:
+                company: Demo Company
+              sales_order:
+                voucher_type: Sales Order
+                voucher_number: SO-1001
+                order_number: SO-1001
+                date: '2026-10-28'
+                order_due_date: '2026-11-04'
+                party:
+                  ledger_name: Demo Customer
+                items:
+                  - stock_item: Demo Item
+                    quantity: 2
+                    unit: Nos
+                    rate: 100
+                    sales_ledger: Sales
+      responses:
+        '200':
+          description: Sales Order accepted by Tally, including an already-completed duplicate.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Tally accepted the Sales Order.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                status: succeeded
+                duplicate: false
+                transaction_type: sales_order
+                voucher_number: SO-1001
+                submitted_voucher_number: SO-1001
+                tally_result:
+                  voucher_number: SO-1001
+                  voucher_number_source: tally
+              schema:
+                $ref: '#/components/schemas/PushResult'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/TallyRejected'
+        '503':
+          description: >-
+            Connector/Tally unavailable. error_code identifies CONNECTOR_NOT_CONNECTED,
+            CONNECTOR_NOT_RESPONDING or TALLY_NOT_CONNECTED. No new job is queued after failed preflight;
+            request_id is present if a disconnection occurred after acceptance.
+          content:
+            application/json:
+              example:
+                success: false
+                code: 2013
+                type: SERVICE_UNAVAILABLE
+                message: Connector is not connected. Start the Connector and connect it to the Server.
+                error_code: CONNECTOR_NOT_CONNECTED
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '504':
+          description: >-
+            Connector has not completed the job within the configured wait. Work may still finish; read status
+            using request_id before retrying. Preflight failures instead return code 2015 with error_code
+            TALLY_TIMEOUT or CONNECTOR_CHECK_TIMEOUT.
+          content:
+            application/json:
+              example:
+                success: false
+                code: 2011
+                type: GATEWAY_TIMEOUT
+                message: >-
+                  The Connector has not returned a Tally result before the response timeout. The request
+                  remains queued or processing.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                status: queued
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-audience: application
+  /api/v1/sales-orders:
+    get:
+      tags:
+        - Sales Orders
+      summary: Fetch a Sales Order directly from Tally by party ledger and voucher number
+      operationId: getSalesOrderFromTally
+      description: >-
+        No prior import request is needed. The authenticated client's Connector searches the specified Tally
+        company for a Sales Order, then exports that voucher by MasterID. The request waits for the existing
+        Connector job flow. Returns the structured JSON in vouchers[0].details, including nested allocation
+        arrays. Field names are lowercase, .LIST suffixes are removed, attributes use _attributes and scalar
+        values remain strings. Without voucher_date, searches 1900-01-01 through 2099-12-31. This is read-only
+        in Tally. The temporary job follows transaction request retention. Requires a responsive Connector and
+        running Tally. party_ledger and voucher_number remain query aliases. Query values are trimmed
+        non-empty strings up to 500 characters. Without voucher_date the date search spans 1900-01-01 through
+        2099-12-31. Scalars in details remain strings; lowercase names remove .LIST suffixes and attributes
+        appear under _attributes.
+      security:
+        - clientId: []
+          clientApiKey: []
+      parameters:
+        - name: company
+          in: query
+          required: true
+          schema:
+            type: string
+          example: Demo Company
+        - name: ledger_name
+          in: query
+          required: true
+          schema:
+            type: string
+          example: Demo Customer
+        - name: voucher_no
+          in: query
+          required: true
+          schema:
+            type: string
+          example: SO-1001
+        - name: voucher_date
+          in: query
+          schema:
+            type: string
+            format: date
+          example: '2026-10-28'
+      responses:
+        '200':
+          description: Sales Order fetched from Tally.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Sales Order retrieved from Tally.
+                vouchers:
+                  - company: Demo Company
+                    ledger_name: Customer Name
+                    voucher_no: SO-1001
+                    details:
+                      vouchernumber: SO-1001
+                      partyledgername: Customer Name
+                      allinventoryentries: []
+                      allledgerentries: []
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          description: No matching Sales Order found in Tally.
+        '409':
+          description: Multiple Sales Orders match; supply voucher_date.
+        '502':
+          description: Connector or Tally lookup/export failed.
+        '503':
+          $ref: '#/components/responses/ConnectorUnavailable'
+        '504':
+          description: Connector did not return a result before the response timeout.
+      x-audience: application
+  /api/v1/sales-orders/{requestId}/status:
+    get:
+      tags:
+        - Sales Orders
+      summary: Get Sales Order processing status
+      operationId: getSalesOrderStatus
+      security:
+        - clientId: []
+          clientApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Sales Order request and latest status.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Sales order request retrieved.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                transaction_type: sales_order
+                status: succeeded
+                attempt_count: 1
+                destination:
+                  company: Demo Company
+              schema:
+                $ref: '#/components/schemas/RequestRecord'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      description: >-
+        Reads saved client-scoped status without contacting Tally. Available while Connector/Tally are
+        offline. Terminal requests are retained 90 days by default; expired jobs return 404.
+      x-audience: application
+  /api/v1/sales-orders/{requestId}/connector:
+    get:
+      tags:
+        - Sales Orders
+      summary: Fetch queued Sales Order payload (Connector only)
+      operationId: getSalesOrderForConnector
+      description: >-
+        Internal endpoint used by the Connector. Do not call from a CRM. This generic Connector fetch also
+        serves ledger_statement and direct voucher lookup jobs. There is no separate ledger Connector HTTP
+        route. Lookup jobs expose lookup metadata; Sales Voucher payloads appear under sales_order for
+        compatibility.
+      security:
+        - clientId: []
+          connectorApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Stored Sales Order payload for Connector processing.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Sales order request retrieved.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                destination:
+                  company: Demo Company
+                transaction_type: sales_order
+                status: queued
+                sales_order:
+                  voucher_type: Sales Order
+                  voucher_number: SO-1001
+                  order_number: SO-1001
+                  date: '2026-10-28'
+                  order_due_date: '2026-11-04'
+                  party:
+                    ledger_name: Demo Customer
+                  items:
+                    - stock_item: Demo Item
+                      quantity: 2
+                      unit: Nos
+                      rate: 100
+                      sales_ledger: Sales
+              schema:
+                $ref: '#/components/schemas/RequestRecord'
+        '401':
+          $ref: '#/components/responses/ConnectorUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-audience: connector
+  /api/v1/sales:
+    get:
+      tags:
+        - Sales Vouchers
+      summary: Fetch a Sales Voucher directly from Tally
+      operationId: getSalesVoucherFromTally
+      description: >-
+        Searches Sales-family vouchers, including custom types such as Sales New, by exact party ledger and
+        voucher number. No prior import request required. Returns structured voucher JSON in
+        vouchers[0].details. Optional date disambiguates repeated numbers. Requires an updated running
+        Connector. Requires a responsive Connector and running Tally. party_ledger and voucher_number remain
+        query aliases. Query values are trimmed non-empty strings up to 500 characters. Without voucher_date
+        the date search spans 1900-01-01 through 2099-12-31. Scalars in details remain strings; lowercase
+        names remove .LIST suffixes and attributes appear under _attributes.
+      security:
+        - clientId: []
+          clientApiKey: []
+      parameters:
+        - name: company
+          in: query
+          required: true
+          schema:
+            type: string
+          example: Demo Company
+        - name: ledger_name
+          in: query
+          required: true
+          schema:
+            type: string
+          example: Demo Customer
+        - name: voucher_no
+          in: query
+          required: true
+          schema:
+            type: string
+          example: INV-1001
+        - name: voucher_date
+          in: query
+          schema:
+            type: string
+            format: date
+          example: '2026-10-28'
+      responses:
+        '200':
+          description: Sales Voucher export returned in vouchers[0].details.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Sales Voucher retrieved from Tally.
+                vouchers:
+                  - company: Demo Company
+                    ledger_name: Demo Customer
+                    voucher_no: INV-1001
+                    details:
+                      vouchernumber: INV-1001
+                      partyledgername: Demo Customer
+                      allinventoryentries: []
+                      allledgerentries: []
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          description: No matching Sales Voucher in Tally.
+        '409':
+          description: Multiple matches; supply voucher_date.
+        '502':
+          description: Tally lookup or export failed.
+        '503':
+          $ref: '#/components/responses/ConnectorUnavailable'
+        '504':
+          description: Connector result timed out.
+      x-audience: application
+  /api/v1/sales/push:
+    post:
+      tags:
+        - Sales Vouchers
+      summary: Create a Sales Voucher in Tally and wait for the result
+      operationId: pushSalesVoucher
+      description: >-
+        The Server queues the job and keeps this HTTP request open for the final Connector/Tally result
+        (default 120 seconds). HTTP 200 confirms succeeded; HTTP 502 means Tally rejected it; HTTP 504 returns
+        request_id when the wait expires, and the stored job may still finish. Read saved status before
+        retrying. New imports require a responsive Connector and running Tally. Reuse idempotency_key only for
+        the same transaction/payload. A completed duplicate returns duplicate: true. The company configured in
+        Connector settings takes precedence over destination.company. Provide sales_ledger on the voucher or
+        every item. This standalone invoice does not link to an existing Sales Order.
+      security:
+        - clientId: []
+          clientApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SalesVoucherPush'
+            example:
+              idempotency_key: CRM-SALES_VOUCHER-1001
+              destination:
+                company: Demo Company
+              sales:
+                voucher_type: Sales
+                voucher_mode: Item Invoice
+                voucher_number: INV-1001
+                date: '2026-10-28'
+                party:
+                  ledger_name: Demo Customer
+                sales_ledger: Sales
+                items:
+                  - stock_item: Demo Item
+                    quantity: 2
+                    unit: Nos
+                    rate: 100
+                total_amount: 200
+      responses:
+        '200':
+          description: Sales Voucher accepted by Tally, including an already-completed duplicate.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Tally accepted the Sales Voucher.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                status: succeeded
+                duplicate: false
+                transaction_type: sales_voucher
+                voucher_number: INV-1001
+                submitted_voucher_number: INV-1001
+                tally_result:
+                  voucher_number: INV-1001
+                  voucher_number_source: tally
+              schema:
+                $ref: '#/components/schemas/PushResult'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/TallyRejected'
+        '503':
+          description: >-
+            Connector/Tally unavailable. error_code identifies CONNECTOR_NOT_CONNECTED,
+            CONNECTOR_NOT_RESPONDING or TALLY_NOT_CONNECTED. No new job is queued after failed preflight;
+            request_id is present if a disconnection occurred after acceptance.
+          content:
+            application/json:
+              example:
+                success: false
+                code: 2013
+                type: SERVICE_UNAVAILABLE
+                message: Connector is not connected. Start the Connector and connect it to the Server.
+                error_code: CONNECTOR_NOT_CONNECTED
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '504':
+          description: >-
+            Connector has not completed the job within the configured wait. Work may still finish; read status
+            using request_id before retrying. Preflight failures instead return code 2015 with error_code
+            TALLY_TIMEOUT or CONNECTOR_CHECK_TIMEOUT.
+          content:
+            application/json:
+              example:
+                success: false
+                code: 2011
+                type: GATEWAY_TIMEOUT
+                message: >-
+                  The Connector has not returned a Tally result before the response timeout. The request
+                  remains queued or processing.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                status: queued
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-audience: application
+  /api/v1/sales/{requestId}:
+    get:
+      tags:
+        - Sales Vouchers
+      summary: Get Sales Voucher processing status
+      operationId: getSalesVoucherStatus
+      security:
+        - clientId: []
+          clientApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Sales Voucher request and latest status.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Sales Voucher request retrieved.
+                request_id: 49cfa49b-7331-4d12-84c1-bf3274efae70
+                transaction_type: sales_voucher
+                status: succeeded
+                attempt_count: 1
+                destination:
+                  company: Demo Company
+              schema:
+                $ref: '#/components/schemas/RequestRecord'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      description: >-
+        Reads saved client-scoped status without contacting Tally. Available while Connector/Tally are
+        offline. Terminal requests are retained 90 days by default; expired jobs return 404.
+      x-audience: application
+  /api/v1/sales/{requestId}/connector:
+    get:
+      tags:
+        - Sales Vouchers
+      summary: Fetch queued Sales Voucher payload (Connector only)
+      operationId: getSalesVoucherForConnector
+      description: Internal endpoint used by the Connector. Do not call from a CRM.
+      security:
+        - clientId: []
+          connectorApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Stored Sales Voucher payload for Connector processing.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Sales Voucher request retrieved.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                destination:
+                  company: Demo Company
+                transaction_type: sales_voucher
+                status: queued
+                sales_order:
+                  voucher_type: Sales
+                  voucher_mode: Item Invoice
+                  voucher_number: INV-1001
+                  date: '2026-10-28'
+                  party:
+                    ledger_name: Demo Customer
+                  sales_ledger: Sales
+                  items:
+                    - stock_item: Demo Item
+                      quantity: 2
+                      unit: Nos
+                      rate: 100
+                      sales_ledger: Sales
+                  total_amount: 200
+                  is_invoice: true
+              schema:
+                $ref: '#/components/schemas/RequestRecord'
+        '401':
+          $ref: '#/components/responses/ConnectorUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-audience: connector
+  /api/v1/sales/pdf:
+    get:
+      tags:
+        - Sales Vouchers
+      summary: Request or download a Sales Voucher PDF directly from Tally
+      operationId: requestSalesVoucherPdfByNumber
+      description: >-
+        Connector searches Tally by company, party ledger and voucher number without a prior import request.
+        Poll the same URL after 202. Zero or multiple Tally matches fail the export (424); supply voucher_date
+        to disambiguate. Cached PDFs and temporary jobs have independent retention. Deleted cache is
+        recreated. Ready cached PDFs remain downloadable with valid client authentication while
+        Connector/Tally are offline. New/uncached exports require Connector and Tally. Use retry=true after
+        fixing a failed export. Default PDF retention is 90 days; request-ID PDFs expire no later than the
+        source request.
+      security:
+        - clientId: []
+          clientApiKey: []
+      parameters:
+        - name: ledger_name
+          in: query
+          required: true
+          description: Exact party ledger name. party_ledger is a compatibility alias.
+          schema:
+            type: string
+            minLength: 1
+        - name: company
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - name: voucher_no
+          in: query
+          required: true
+          description: Exact Tally voucher number. voucher_number is a compatibility alias.
+          schema:
+            type: string
+            minLength: 1
+        - name: voucher_date
+          in: query
+          description: Optional date to disambiguate repeated voucher numbers across years.
+          schema:
+            type: string
+            format: date
+        - name: retry
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: PDF file is ready.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '202':
+          $ref: '#/components/responses/PdfPending'
+        '400':
+          description: Invalid or missing company, ledger_name, voucher_no or voucher_date.
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '424':
+          description: Tally lookup or export failed; correct values or supply voucher_date then retry.
+        '503':
+          $ref: '#/components/responses/ConnectorUnavailable'
+        '504':
+          $ref: '#/components/responses/AvailabilityTimeout'
+      x-audience: application
+  /api/v1/sales/{requestId}/pdf:
+    get:
+      tags:
+        - Sales Vouchers
+      summary: Request or download a Sales Voucher PDF
+      operationId: requestSalesVoucherPdf
+      description: >-
+        CRM calls this endpoint only when a PDF is needed. The first call requests an export from the
+        registered Connector and returns 202. Poll the same endpoint; once the Connector uploads the PDF, the
+        response is application/pdf. Sales Voucher request documents and PDF artifacts have separate MongoDB
+        retention windows. Ready cached PDFs remain downloadable with valid client authentication while
+        Connector/Tally are offline. New/uncached exports require Connector and Tally. Use retry=true after
+        fixing a failed export. Default PDF retention is 90 days; request-ID PDFs expire no later than the
+        source request.
+      security:
+        - clientId: []
+          clientApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - name: retry
+          in: query
+          required: false
+          description: Set true to start a new export after a prior failed attempt.
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: PDF file is ready.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '202':
+          $ref: '#/components/responses/PdfPending'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Sales Voucher has not succeeded in Tally yet.
+        '424':
+          description: Previous PDF export failed; retry=true starts a new export attempt.
+        '503':
+          $ref: '#/components/responses/ConnectorUnavailable'
+        '504':
+          $ref: '#/components/responses/AvailabilityTimeout'
+      x-audience: application
+  /api/v1/sales/{requestId}/pdf/connector:
+    post:
+      tags:
+        - Sales Vouchers
+      summary: Upload exported PDF (Connector only)
+      operationId: uploadSalesVoucherPdf
+      description: >-
+        Connector uploads actual exported PDF bytes with Content-Type application/pdf. Maximum 15 MiB and a
+        valid %PDF- signature. An active queued/generating PDF job must exist. Source Sales Voucher must have
+        succeeded unless this is a direct-lookup job. X-PDF-Filename is optional.
+      security:
+        - clientId: []
+          connectorApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - name: X-PDF-Filename
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/pdf:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: PDF stored for CRM download.
+        '400':
+          description: Invalid PDF or file is larger than 15 MB.
+        '401':
+          $ref: '#/components/responses/ConnectorUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: No active export job, or source Sales Voucher is not ready.
+      x-audience: connector
+    get:
+      tags:
+        - Sales Vouchers
+      summary: Fetch PDF export lookup metadata (Connector only)
+      operationId: getSalesPdfConnectorJob
+      description: >-
+        Internal desktop Connector route. lookup is populated for direct Tally lookup exports and null for
+        request-ID exports, which fetch the related transaction payload.
+      security:
+        - clientId: []
+          connectorApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: PDF export job metadata.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Success
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                lookup:
+                  company: Demo Company
+                  ledger_name: Demo Customer
+                  voucher_no: INV-1001
+        '401':
+          $ref: '#/components/responses/ConnectorUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-audience: connector
+  /api/v1/sales/{requestId}/pdf/connector/status:
+    post:
+      tags:
+        - Sales Vouchers
+      summary: Update PDF export status (Connector only)
+      operationId: updateSalesVoucherPdfStatus
+      security:
+        - clientId: []
+          connectorApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum:
+                    - generating
+                    - failed
+                error:
+                  type: string
+                error_code:
+                  type: string
+                  enum:
+                    - TALLY_NOT_CONNECTED
+                    - TALLY_TIMEOUT
+                  description: Optional structured failure cause for failed status.
+            example:
+              status: failed
+              error: Tally is not connected.
+              error_code: TALLY_NOT_CONNECTED
+      responses:
+        '200':
+          description: PDF export status updated.
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/ConnectorUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: No active queued/generating PDF export job.
+      x-audience: connector
+  /api/v1/receipts/push:
+    post:
+      tags:
+        - Receipt Vouchers
+      summary: Create a Receipt Voucher in Tally and wait for the result
+      operationId: pushReceiptVoucher
+      description: >-
+        The Server queues the job and keeps this HTTP request open for the final Connector/Tally result
+        (default 120 seconds). HTTP 200 confirms succeeded; HTTP 502 means Tally rejected it; HTTP 504 returns
+        request_id when the wait expires, and the stored job may still finish. Read saved status before
+        retrying. New imports require a responsive Connector and running Tally. Reuse idempotency_key only for
+        the same transaction/payload. A completed duplicate returns duplicate: true. The company configured in
+        Connector settings takes precedence over destination.company. A supplied bill_reference defaults
+        bill_type to Agst Ref; without a reference, the receipt is On Account.
+      security:
+        - clientId: []
+          clientApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReceiptVoucherPush'
+            example:
+              idempotency_key: CRM-RECEIPT_VOUCHER-1001
+              destination:
+                company: Demo Company
+              receipt:
+                voucher_type: Receipt
+                voucher_number: REC-1001
+                date: '2026-10-28'
+                party:
+                  ledger_name: Demo Customer
+                payment:
+                  ledger_name: Cash
+                amount: 200
+      responses:
+        '200':
+          description: Receipt Voucher accepted by Tally, including an already-completed duplicate.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Tally accepted the Receipt Voucher.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                status: succeeded
+                duplicate: false
+                transaction_type: receipt_voucher
+                voucher_number: REC-1001
+                submitted_voucher_number: REC-1001
+                tally_result:
+                  voucher_number: REC-1001
+                  voucher_number_source: tally
+              schema:
+                $ref: '#/components/schemas/PushResult'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/TallyRejected'
+        '503':
+          description: >-
+            Connector/Tally unavailable. error_code identifies CONNECTOR_NOT_CONNECTED,
+            CONNECTOR_NOT_RESPONDING or TALLY_NOT_CONNECTED. No new job is queued after failed preflight;
+            request_id is present if a disconnection occurred after acceptance.
+          content:
+            application/json:
+              example:
+                success: false
+                code: 2013
+                type: SERVICE_UNAVAILABLE
+                message: Connector is not connected. Start the Connector and connect it to the Server.
+                error_code: CONNECTOR_NOT_CONNECTED
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '504':
+          description: >-
+            Connector has not completed the job within the configured wait. Work may still finish; read status
+            using request_id before retrying. Preflight failures instead return code 2015 with error_code
+            TALLY_TIMEOUT or CONNECTOR_CHECK_TIMEOUT.
+          content:
+            application/json:
+              example:
+                success: false
+                code: 2011
+                type: GATEWAY_TIMEOUT
+                message: >-
+                  The Connector has not returned a Tally result before the response timeout. The request
+                  remains queued or processing.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                status: queued
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-audience: application
+  /api/v1/receipts/{requestId}:
+    get:
+      tags:
+        - Receipt Vouchers
+      summary: Get Receipt Voucher processing status
+      operationId: getReceiptVoucherStatus
+      security:
+        - clientId: []
+          clientApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Receipt Voucher request and latest status.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Receipt Voucher request retrieved.
+                request_id: f5cab14e-f031-4fb8-aeb3-5a17edc1d49f
+                transaction_type: receipt_voucher
+                status: succeeded
+                attempt_count: 1
+                destination:
+                  company: Demo Company
+              schema:
+                $ref: '#/components/schemas/RequestRecord'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      description: >-
+        Reads saved client-scoped status without contacting Tally. Available while Connector/Tally are
+        offline. Terminal requests are retained 90 days by default; expired jobs return 404.
+      x-audience: application
+  /api/v1/receipts/{requestId}/connector:
+    get:
+      tags:
+        - Receipt Vouchers
+      summary: Fetch Receipt Voucher payload (Connector only)
+      operationId: getReceiptVoucherForConnector
+      description: Internal endpoint used by the Connector. Do not call from a CRM.
+      security:
+        - clientId: []
+          connectorApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Stored Receipt Voucher payload for Connector processing.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Receipt Voucher request retrieved.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                destination:
+                  company: Demo Company
+                transaction_type: receipt_voucher
+                status: queued
+                receipt:
+                  voucher_type: Receipt
+                  voucher_number: REC-1001
+                  date: '2026-10-28'
+                  party:
+                    ledger_name: Demo Customer
+                  payment:
+                    ledger_name: Cash
+                  amount: 200
+              schema:
+                $ref: '#/components/schemas/RequestRecord'
+        '401':
+          $ref: '#/components/responses/ConnectorUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-audience: connector
+  /api/console/auth/status:
+    get:
+      tags:
+        - Admin Console
+      summary: Check whether Admin Console login is configured
+      operationId: getConsoleAuthStatus
+      responses:
+        '200':
+          description: Console credential configuration status.
+          content:
+            application/json:
+              example:
+                configured: true
+      security: []
+      x-audience: admin
+  /api/console/auth/login:
+    post:
+      tags:
+        - Admin Console
+      summary: Sign in to the Admin Console
+      operationId: loginToConsole
+      description: >-
+        Uses the Server's CONSOLE_USERNAME and CONSOLE_PASSWORD settings. Successful login sets an HTTP-only
+        session cookie valid for eight hours. Do not store production credentials in a shared collection.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                  format: password
+            example:
+              username: '{{console_username}}'
+              password: '{{console_password}}'
+      responses:
+        '200':
+          description: Login successful; response sets the session cookie.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: HTTP-only tally_console_session cookie.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1400
+                type: OK
+                message: Admin Console login successful.
+                authenticated: true
+                username: '{{console_username}}'
+        '401':
+          description: Incorrect Console username or password.
+          content:
+            application/json:
+              example:
+                success: false
+                code: 2401
+                type: UNAUTHORIZED
+                message: Username or password is incorrect.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security: []
+      x-audience: admin
+  /api/console/auth/logout:
+    post:
+      tags:
+        - Admin Console
+      summary: Sign out of the Admin Console
+      operationId: logoutFromConsole
+      description: Clears the Console session cookie.
+      responses:
+        '200':
+          description: Console session ended.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1401
+                type: OK
+                message: Admin Console session ended.
+                authenticated: false
+      security: []
+      x-audience: admin
+  /api/console/auth/me:
+    get:
+      tags:
+        - Admin Console
+      summary: Get current Admin Console session
+      operationId: getConsoleSession
+      security:
+        - consoleSession: []
+      responses:
+        '200':
+          description: Current authenticated user.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1400
+                type: OK
+                message: Admin Console session is active.
+                authenticated: true
+                username: '{{console_username}}'
+        '401':
+          $ref: '#/components/responses/ConsoleUnauthorized'
+      x-audience: admin
+  /api/console/snapshot:
+    get:
+      tags:
+        - Admin Console
+      summary: Get Server Console dashboard snapshot
+      operationId: getConsoleSnapshot
+      security:
+        - consoleSession: []
+      responses:
+        '200':
+          description: Runtime, MongoDB, connector, queued job, and recent log snapshot.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1400
+                type: OK
+                message: Admin Console snapshot loaded.
+                capturedAt: '2026-10-12T06:00:00.000Z'
+                server:
+                  status: online
+                  environment: production
+                  nodeVersion: v24.15.0
+                  uptimeSeconds: 3600
+                  startedAt: '2026-10-12T05:00:00.000Z'
+                socket:
+                  status: online
+                  registeredCount: 1
+                  connectors: []
+                database:
+                  status: connected
+                  clients:
+                    total: 1
+                    active: 1
+                  salesOrders:
+                    total: 1
+                    byStatus:
+                      queued: 0
+                      processing: 0
+                      fetching: 0
+                      building_xml: 0
+                      pushing: 0
+                      succeeded: 1
+                      failed: 0
+                jobs: []
+                logs: []
+        '401':
+          $ref: '#/components/responses/ConsoleUnauthorized'
+      x-audience: admin
+  /api/v1/purchase-orders/push:
+    post:
+      tags:
+        - Purchase Orders
+      operationId: pushPurchaseOrder
+      summary: Create a Purchase Order in Tally and wait for the result
+      description: >-
+        The Server queues the job and keeps this HTTP request open for the final Connector/Tally result
+        (default 120 seconds). HTTP 200 confirms succeeded; HTTP 502 means Tally rejected it; HTTP 504 returns
+        request_id when the wait expires, and the stored job may still finish. Read saved status before
+        retrying. New imports require a responsive Connector and running Tally. Reuse idempotency_key only for
+        the same transaction/payload. A completed duplicate returns duplicate: true. The company configured in
+        Connector settings takes precedence over destination.company. Every order item requires order_due_date
+        on the item or inherited from the order.
+      security:
+        - clientId: []
+          clientApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseOrderPush'
+            example:
+              idempotency_key: CRM-PURCHASE_ORDER-1001
+              destination:
+                company: Demo Company
+              purchase_order:
+                voucher_type: Purchase Order
+                voucher_number: PO-1001
+                order_number: ORDER-1001
+                date: '2026-10-28'
+                order_due_date: '2026-11-04'
+                party:
+                  ledger_name: Demo Supplier
+                purchase_ledger: Purchase
+                items:
+                  - stock_item: Demo Item
+                    quantity: 2
+                    unit: Nos
+                    rate: 100
+                total_amount: 200
+      responses:
+        '200':
+          description: Purchase Order accepted by Tally, including an already-completed duplicate.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Tally accepted the Purchase Order.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                status: succeeded
+                duplicate: false
+                transaction_type: purchase_order
+                voucher_number: PO-1001
+                submitted_voucher_number: PO-1001
+                tally_result:
+                  voucher_number: PO-1001
+                  voucher_number_source: tally
+              schema:
+                $ref: '#/components/schemas/PushResult'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/TallyRejected'
+        '503':
+          description: >-
+            Connector/Tally unavailable. error_code identifies CONNECTOR_NOT_CONNECTED,
+            CONNECTOR_NOT_RESPONDING or TALLY_NOT_CONNECTED. No new job is queued after failed preflight;
+            request_id is present if a disconnection occurred after acceptance.
+          content:
+            application/json:
+              example:
+                success: false
+                code: 2013
+                type: SERVICE_UNAVAILABLE
+                message: Connector is not connected. Start the Connector and connect it to the Server.
+                error_code: CONNECTOR_NOT_CONNECTED
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '504':
+          description: >-
+            Connector has not completed the job within the configured wait. Work may still finish; read status
+            using request_id before retrying. Preflight failures instead return code 2015 with error_code
+            TALLY_TIMEOUT or CONNECTOR_CHECK_TIMEOUT.
+          content:
+            application/json:
+              example:
+                success: false
+                code: 2011
+                type: GATEWAY_TIMEOUT
+                message: >-
+                  The Connector has not returned a Tally result before the response timeout. The request
+                  remains queued or processing.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                status: queued
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-audience: application
+  /api/v1/purchase-orders/{requestId}:
+    get:
+      tags:
+        - Purchase Orders
+      summary: Read saved Purchase Order status
+      operationId: getPurchaseOrderStatus
+      description: >-
+        Reads the persisted client-scoped request without contacting Tally; available while Connector/Tally
+        are offline. Missing/mismatched request kind returns 404. Terminal jobs are retained 90 days by
+        default.
+      security:
+        - clientId: []
+          clientApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Stored request and latest status/result.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Purchase Order request retrieved.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                transaction_type: purchase_order
+                status: succeeded
+                attempt_count: 1
+                destination:
+                  company: Demo Company
+                purchase_order:
+                  voucher_type: Purchase Order
+                  voucher_number: PO-1001
+                  order_number: ORDER-1001
+                  date: '2026-10-28'
+                  order_due_date: '2026-11-04'
+                  party:
+                    ledger_name: Demo Supplier
+                  purchase_ledger: Purchase
+                  items:
+                    - stock_item: Demo Item
+                      quantity: 2
+                      unit: Nos
+                      rate: 100
+                  total_amount: 200
+                tally_result:
+                  voucher_number: PO-1001
+                  voucher_number_source: tally
+              schema:
+                $ref: '#/components/schemas/RequestRecord'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-audience: application
+  /api/v1/purchase-orders/{requestId}/connector:
+    get:
+      tags:
+        - Purchase Orders
+      summary: Fetch Purchase Order payload (Connector only)
+      operationId: getPurchaseOrderForConnector
+      description: >-
+        Internal desktop Connector payload fetch. Application integrations use push/status routes. The stored
+        payload is in purchase_order.
+      security:
+        - clientId: []
+          connectorApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Stored request and payload for Connector processing.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Purchase Order request retrieved.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                transaction_type: purchase_order
+                status: succeeded
+                attempt_count: 1
+                destination:
+                  company: Demo Company
+                purchase_order:
+                  voucher_type: Purchase Order
+                  voucher_number: PO-1001
+                  order_number: ORDER-1001
+                  date: '2026-10-28'
+                  order_due_date: '2026-11-04'
+                  party:
+                    ledger_name: Demo Supplier
+                  purchase_ledger: Purchase
+                  items:
+                    - stock_item: Demo Item
+                      quantity: 2
+                      unit: Nos
+                      rate: 100
+                  total_amount: 200
+                tally_result:
+                  voucher_number: PO-1001
+                  voucher_number_source: tally
+              schema:
+                $ref: '#/components/schemas/RequestRecord'
+        '401':
+          $ref: '#/components/responses/ConnectorUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-audience: connector
+  /api/v1/purchases/push:
+    post:
+      tags:
+        - Purchase Vouchers
+      operationId: pushPurchaseVoucher
+      summary: Create a Purchase Voucher in Tally and wait for the result
+      description: >-
+        The Server queues the job and keeps this HTTP request open for the final Connector/Tally result
+        (default 120 seconds). HTTP 200 confirms succeeded; HTTP 502 means Tally rejected it; HTTP 504 returns
+        request_id when the wait expires, and the stored job may still finish. Read saved status before
+        retrying. New imports require a responsive Connector and running Tally. Reuse idempotency_key only for
+        the same transaction/payload. A completed duplicate returns duplicate: true. The company configured in
+        Connector settings takes precedence over destination.company. Use exact Tally supplier, stock and
+        payment master names.
+      security:
+        - clientId: []
+          clientApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseVoucherPush'
+            example:
+              idempotency_key: CRM-PURCHASE_VOUCHER-1001
+              destination:
+                company: Demo Company
+              purchase:
+                voucher_type: Purchase
+                voucher_number: PUR-1001
+                date: '2026-10-28'
+                party:
+                  ledger_name: Demo Supplier
+                purchase_ledger: Purchase
+                items:
+                  - stock_item: Demo Item
+                    quantity: 2
+                    unit: Nos
+                    rate: 100
+                total_amount: 200
+      responses:
+        '200':
+          description: Purchase Voucher accepted by Tally, including an already-completed duplicate.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Tally accepted the Purchase Voucher.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                status: succeeded
+                duplicate: false
+                transaction_type: purchase_voucher
+                voucher_number: PUR-1001
+                submitted_voucher_number: PUR-1001
+                tally_result:
+                  voucher_number: PUR-1001
+                  voucher_number_source: tally
+              schema:
+                $ref: '#/components/schemas/PushResult'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/TallyRejected'
+        '503':
+          description: >-
+            Connector/Tally unavailable. error_code identifies CONNECTOR_NOT_CONNECTED,
+            CONNECTOR_NOT_RESPONDING or TALLY_NOT_CONNECTED. No new job is queued after failed preflight;
+            request_id is present if a disconnection occurred after acceptance.
+          content:
+            application/json:
+              example:
+                success: false
+                code: 2013
+                type: SERVICE_UNAVAILABLE
+                message: Connector is not connected. Start the Connector and connect it to the Server.
+                error_code: CONNECTOR_NOT_CONNECTED
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '504':
+          description: >-
+            Connector has not completed the job within the configured wait. Work may still finish; read status
+            using request_id before retrying. Preflight failures instead return code 2015 with error_code
+            TALLY_TIMEOUT or CONNECTOR_CHECK_TIMEOUT.
+          content:
+            application/json:
+              example:
+                success: false
+                code: 2011
+                type: GATEWAY_TIMEOUT
+                message: >-
+                  The Connector has not returned a Tally result before the response timeout. The request
+                  remains queued or processing.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                status: queued
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-audience: application
+  /api/v1/purchases/{requestId}:
+    get:
+      tags:
+        - Purchase Vouchers
+      summary: Read saved Purchase Voucher status
+      operationId: getPurchaseVoucherStatus
+      description: >-
+        Reads the persisted client-scoped request without contacting Tally; available while Connector/Tally
+        are offline. Missing/mismatched request kind returns 404. Terminal jobs are retained 90 days by
+        default.
+      security:
+        - clientId: []
+          clientApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Stored request and latest status/result.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Purchase Voucher request retrieved.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                transaction_type: purchase_voucher
+                status: succeeded
+                attempt_count: 1
+                destination:
+                  company: Demo Company
+                purchase:
+                  voucher_type: Purchase
+                  voucher_number: PUR-1001
+                  date: '2026-10-28'
+                  party:
+                    ledger_name: Demo Supplier
+                  purchase_ledger: Purchase
+                  items:
+                    - stock_item: Demo Item
+                      quantity: 2
+                      unit: Nos
+                      rate: 100
+                  total_amount: 200
+                tally_result:
+                  voucher_number: PUR-1001
+                  voucher_number_source: tally
+              schema:
+                $ref: '#/components/schemas/RequestRecord'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-audience: application
+  /api/v1/purchases/{requestId}/connector:
+    get:
+      tags:
+        - Purchase Vouchers
+      summary: Fetch Purchase Voucher payload (Connector only)
+      operationId: getPurchaseVoucherForConnector
+      description: >-
+        Internal desktop Connector payload fetch. Application integrations use push/status routes. The stored
+        payload is in purchase.
+      security:
+        - clientId: []
+          connectorApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Stored request and payload for Connector processing.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Purchase Voucher request retrieved.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                transaction_type: purchase_voucher
+                status: succeeded
+                attempt_count: 1
+                destination:
+                  company: Demo Company
+                purchase:
+                  voucher_type: Purchase
+                  voucher_number: PUR-1001
+                  date: '2026-10-28'
+                  party:
+                    ledger_name: Demo Supplier
+                  purchase_ledger: Purchase
+                  items:
+                    - stock_item: Demo Item
+                      quantity: 2
+                      unit: Nos
+                      rate: 100
+                  total_amount: 200
+                tally_result:
+                  voucher_number: PUR-1001
+                  voucher_number_source: tally
+              schema:
+                $ref: '#/components/schemas/RequestRecord'
+        '401':
+          $ref: '#/components/responses/ConnectorUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-audience: connector
+  /api/v1/payments/push:
+    post:
+      tags:
+        - Payment Vouchers
+      operationId: pushPaymentVoucher
+      summary: Create a Payment Voucher in Tally and wait for the result
+      description: >-
+        The Server queues the job and keeps this HTTP request open for the final Connector/Tally result
+        (default 120 seconds). HTTP 200 confirms succeeded; HTTP 502 means Tally rejected it; HTTP 504 returns
+        request_id when the wait expires, and the stored job may still finish. Read saved status before
+        retrying. New imports require a responsive Connector and running Tally. Reuse idempotency_key only for
+        the same transaction/payload. A completed duplicate returns duplicate: true. The company configured in
+        Connector settings takes precedence over destination.company. Use exact Tally supplier, stock and
+        payment master names.
+      security:
+        - clientId: []
+          clientApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentVoucherPush'
+            example:
+              idempotency_key: CRM-PAYMENT_VOUCHER-1001
+              destination:
+                company: Demo Company
+              payment:
+                voucher_type: Payment
+                voucher_number: PAY-1001
+                date: '2026-10-28'
+                party:
+                  ledger_name: Demo Supplier
+                payment:
+                  ledger_name: Cash
+                amount: 200
+      responses:
+        '200':
+          description: Payment Voucher accepted by Tally, including an already-completed duplicate.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Tally accepted the Payment Voucher.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                status: succeeded
+                duplicate: false
+                transaction_type: payment_voucher
+                voucher_number: PAY-1001
+                submitted_voucher_number: PAY-1001
+                tally_result:
+                  voucher_number: PAY-1001
+                  voucher_number_source: tally
+              schema:
+                $ref: '#/components/schemas/PushResult'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/TallyRejected'
+        '503':
+          description: >-
+            Connector/Tally unavailable. error_code identifies CONNECTOR_NOT_CONNECTED,
+            CONNECTOR_NOT_RESPONDING or TALLY_NOT_CONNECTED. No new job is queued after failed preflight;
+            request_id is present if a disconnection occurred after acceptance.
+          content:
+            application/json:
+              example:
+                success: false
+                code: 2013
+                type: SERVICE_UNAVAILABLE
+                message: Connector is not connected. Start the Connector and connect it to the Server.
+                error_code: CONNECTOR_NOT_CONNECTED
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '504':
+          description: >-
+            Connector has not completed the job within the configured wait. Work may still finish; read status
+            using request_id before retrying. Preflight failures instead return code 2015 with error_code
+            TALLY_TIMEOUT or CONNECTOR_CHECK_TIMEOUT.
+          content:
+            application/json:
+              example:
+                success: false
+                code: 2011
+                type: GATEWAY_TIMEOUT
+                message: >-
+                  The Connector has not returned a Tally result before the response timeout. The request
+                  remains queued or processing.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                status: queued
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-audience: application
+  /api/v1/payments/{requestId}:
+    get:
+      tags:
+        - Payment Vouchers
+      summary: Read saved Payment Voucher status
+      operationId: getPaymentVoucherStatus
+      description: >-
+        Reads the persisted client-scoped request without contacting Tally; available while Connector/Tally
+        are offline. Missing/mismatched request kind returns 404. Terminal jobs are retained 90 days by
+        default.
+      security:
+        - clientId: []
+          clientApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Stored request and latest status/result.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Payment Voucher request retrieved.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                transaction_type: payment_voucher
+                status: succeeded
+                attempt_count: 1
+                destination:
+                  company: Demo Company
+                payment:
+                  voucher_type: Payment
+                  voucher_number: PAY-1001
+                  date: '2026-10-28'
+                  party:
+                    ledger_name: Demo Supplier
+                  payment:
+                    ledger_name: Cash
+                  amount: 200
+                tally_result:
+                  voucher_number: PAY-1001
+                  voucher_number_source: tally
+              schema:
+                $ref: '#/components/schemas/RequestRecord'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-audience: application
+  /api/v1/payments/{requestId}/connector:
+    get:
+      tags:
+        - Payment Vouchers
+      summary: Fetch Payment Voucher payload (Connector only)
+      operationId: getPaymentVoucherForConnector
+      description: >-
+        Internal desktop Connector payload fetch. Application integrations use push/status routes. The stored
+        payload is in payment.
+      security:
+        - clientId: []
+          connectorApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Stored request and payload for Connector processing.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Payment Voucher request retrieved.
+                request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+                transaction_type: payment_voucher
+                status: succeeded
+                attempt_count: 1
+                destination:
+                  company: Demo Company
+                payment:
+                  voucher_type: Payment
+                  voucher_number: PAY-1001
+                  date: '2026-10-28'
+                  party:
+                    ledger_name: Demo Supplier
+                  payment:
+                    ledger_name: Cash
+                  amount: 200
+                tally_result:
+                  voucher_number: PAY-1001
+                  voucher_number_source: tally
+              schema:
+                $ref: '#/components/schemas/RequestRecord'
+        '401':
+          $ref: '#/components/responses/ConnectorUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-audience: connector
+components:
+  securitySchemes:
+    clientId:
+      type: apiKey
+      in: header
+      name: X-Client-ID
+      description: Client ID issued during registration.
+    clientApiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: CRM API key sent to the registered email address.
+    connectorApiKey:
+      type: apiKey
+      in: header
+      name: X-Connector-Key
+      description: Connector key sent to the registered email address.
+    consoleSession:
+      type: apiKey
+      in: cookie
+      name: tally_console_session
+      description: Session cookie created by POST /api/console/auth/login.
+  parameters:
+    RequestId:
+      name: requestId
+      in: path
+      required: true
+      description: Request ID returned by the push endpoint.
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    ClientRegistration:
+      type: object
+      required:
+        - name
+        - company_name
+        - email
+        - tally_license_no
+      properties:
+        name:
+          type: string
+          maxLength: 120
+        company_name:
+          type: string
+          maxLength: 160
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        tally_license_no:
+          type: string
+          maxLength: 100
+    SalesOrderPush:
+      type: object
+      required:
+        - destination
+        - sales_order
+      properties:
+        idempotency_key:
+          type: string
+          description: >-
+            Optional retry key, max 200 characters. Reuse only for the same transaction and payload. Use
+            module-specific prefixes. A duplicate returns the saved request; payloads are not compared.
+          maxLength: 200
+        destination:
+          $ref: '#/components/schemas/Destination'
+        sales_order:
+          type: object
+          description: >-
+            Canonical Sales Order payload. Server validates a non-empty order and allocation due dates; the
+            Connector performs remaining Tally business validation. Every item requires a date inherited from
+            the order or supplied on the item.
+          required:
+            - date
+            - party
+            - items
+          properties:
+            voucher_type:
+              type: string
+              example: Sales Order
+            order_due_date:
+              type: string
+              format: date
+              description: Required unless every item specifies its own order_due_date; no automatic default.
+              example: '2026-11-07'
+            voucher_number:
+              type: string
+            date:
+              type: string
+              description: YYYY-MM-DD, YYYYMMDD, or DD-MM-YYYY.
+              example: '2026-10-12'
+            party:
+              $ref: '#/components/schemas/PartyLedger'
+            items:
+              type: array
+              minItems: 1
+              items:
+                $ref: '#/components/schemas/Item'
+            order_number:
+              type: string
+              description: Order allocation reference, separate from voucher_number.
+              example: SO-1001
+            sales_ledger:
+              type: string
+              description: Optional default sales ledger.
+              example: Sales
+    SalesVoucherPush:
+      type: object
+      required:
+        - destination
+        - sales
+      properties:
+        idempotency_key:
+          type: string
+          description: >-
+            Optional retry key, max 200 characters. Reuse only for the same transaction and payload. Use
+            module-specific prefixes. A duplicate returns the saved request; payloads are not compared.
+          maxLength: 200
+        destination:
+          $ref: '#/components/schemas/Destination'
+        sales:
+          type: object
+          required:
+            - date
+            - party
+            - items
+          properties:
+            voucher_type:
+              type: string
+              default: Sales
+            voucher_mode:
+              type: string
+              default: Item Invoice
+            voucher_number:
+              type: string
+            date:
+              type: string
+              description: YYYY-MM-DD, YYYYMMDD, or DD-MM-YYYY.
+              example: '2026-10-12'
+            party:
+              $ref: '#/components/schemas/PartyLedger'
+            items:
+              type: array
+              minItems: 1
+              items:
+                $ref: '#/components/schemas/Item'
+            total_amount:
+              type: number
+              minimum: 0
+              description: Must equal item totals plus any tax/charge ledger amounts.
+            sales_ledger:
+              type: string
+              description: Default sales ledger for all items, otherwise specify it on every item.
+              example: Sales
+            party_ledger_entry:
+              type: object
+              description: >-
+                Optional explicit customer ledger entry; service normalizes amount to a negative absolute
+                value.
+              properties:
+                ledger:
+                  type: string
+                amount:
+                  type: number
+                bill_reference:
+                  type: string
+                bill_type:
+                  type: string
+          description: >-
+            Canonical item invoice. Every item must specify sales_ledger or inherit sales.sales_ledger. Legacy
+            party_ledger and other aliases are accepted.
+    ReceiptVoucherPush:
+      type: object
+      required:
+        - destination
+        - receipt
+      properties:
+        idempotency_key:
+          type: string
+          description: >-
+            Optional retry key, max 200 characters. Reuse only for the same transaction and payload. Use
+            module-specific prefixes. A duplicate returns the saved request; payloads are not compared.
+          maxLength: 200
+        destination:
+          $ref: '#/components/schemas/Destination'
+        receipt:
+          type: object
+          required:
+            - date
+            - party
+            - payment
+            - amount
+          properties:
+            voucher_type:
+              type: string
+              default: Receipt
+            voucher_number:
+              type: string
+            date:
+              type: string
+              description: YYYY-MM-DD, YYYYMMDD, or DD-MM-YYYY.
+              example: '2026-10-12'
+            party:
+              $ref: '#/components/schemas/PartyLedger'
+            payment:
+              $ref: '#/components/schemas/CashBankLedger'
+            amount:
+              type: number
+              minimum: 0
+              exclusiveMinimum: true
+            bill_reference:
+              type: string
+              description: >-
+                Existing sales bill reference. Defaults bill_type to Agst Ref when supplied; otherwise service
+                uses On Account.
+            bill_type:
+              type: string
+              default: Agst Ref
+            custom_fields:
+              type: object
+              additionalProperties: {}
+    Item:
+      type: object
+      required:
+        - stock_item
+        - quantity
+        - rate
+      properties:
+        stock_item:
+          type: string
+          example: Demo Item
+        quantity:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          example: 2
+        unit:
+          type: string
+          example: Nos
+        actual_quantity:
+          type: number
+        actual_unit:
+          type: string
+        rate:
+          type: number
+          minimum: 0
+          example: 100
+        amount:
+          type: number
+        sales_ledger:
+          type: string
+          description: >-
+            Sales ledger for this item. For Sales Vouchers it is required here or inherited from
+            sales.sales_ledger.
+        batch:
+          type: object
+          description: Include for stock items requiring batch/godown allocation; use exact Tally master names.
+          properties:
+            name:
+              type: string
+            godown:
+              type: string
+            manufactured_on:
+              type: string
+              format: date
+            expiry_date:
+              type: string
+              format: date
+        order_due_date:
+          type: string
+          description: >-
+            Order allocation due date. Item value overrides order-level due date. Required for each
+            Sales/Purchase Order item unless a valid order-level date is supplied.
+          format: date
+          example: '2026-10-28'
+        purchase_ledger:
+          type: string
+          description: Purchase ledger for this item; may inherit purchase.purchase_ledger.
+          example: Purchase
+    ApiError:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        code:
+          type: integer
+        type:
+          type: string
+        message:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+        error_code:
+          type: string
+          description: >-
+            Optional machine-readable availability failure: CONNECTOR_NOT_CONNECTED, CONNECTOR_NOT_RESPONDING,
+            TALLY_NOT_CONNECTED, TALLY_TIMEOUT or CONNECTOR_CHECK_TIMEOUT.
+        request_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        error:
+          type: string
+    Destination:
+      type: object
+      required:
+        - company
+      description: >-
+        Exact Tally company name. A company configured in Connector settings takes precedence for voucher
+        imports. company_name remains a legacy alias.
+      properties:
+        company:
+          type: string
+          description: Exact company name.
+          example: Demo Company
+    PartyLedger:
+      type: object
+      required:
+        - ledger_name
+      properties:
+        ledger_name:
+          type: string
+          description: Exact customer or supplier ledger name in the selected Tally company.
+          example: Demo Customer
+        group:
+          type: string
+          description: Optional Tally parent group for supported missing-ledger recovery.
+    CashBankLedger:
+      type: object
+      required:
+        - ledger_name
+      properties:
+        ledger_name:
+          type: string
+          description: Exact Cash or Bank ledger name in Tally.
+          example: Cash
+        group:
+          type: string
+          description: Optional Tally parent group.
+        type:
+          type: string
+          enum:
+            - cash
+            - bank
+    ApiEnvelope:
+      type: object
+      required:
+        - success
+        - code
+        - type
+        - message
+      description: >-
+        JSON envelope. Result properties are at the top level unless the operation explicitly documents data
+        or statement.
+      properties:
+        success:
+          type: boolean
+        code:
+          type: integer
+        type:
+          type: string
+          description: HTTP status label such as OK, CREATED, BAD_REQUEST or GATEWAY_TIMEOUT.
+        message:
+          type: string
+    PushResult:
+      type: object
+      required:
+        - success
+        - code
+        - type
+        - message
+        - request_id
+        - status
+      properties:
+        success:
+          type: boolean
+        code:
+          type: integer
+        type:
+          type: string
+          description: HTTP status label such as OK, CREATED, BAD_REQUEST or GATEWAY_TIMEOUT.
+        message:
+          type: string
+        request_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - succeeded
+        duplicate:
+          type: boolean
+        transaction_type:
+          type: string
+          enum:
+            - sales_order
+            - sales_voucher
+            - receipt_voucher
+            - purchase_order
+            - purchase_voucher
+            - payment_voucher
+        voucher_number:
+          type: string
+          nullable: true
+          description: Verified number from Tally; null when no final number was confirmed.
+        submitted_voucher_number:
+          type: string
+          nullable: true
+        tally_result:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Available metadata depends on the Connector/Tally result.
+    RequestRecord:
+      type: object
+      description: >-
+        Client-scoped stored request. Additional payload/timestamp/result properties can be present. Sales
+        Vouchers are stored under sales_order for Connector compatibility.
+      properties:
+        success:
+          type: boolean
+        code:
+          type: integer
+        type:
+          type: string
+          description: HTTP status label such as OK, CREATED, BAD_REQUEST or GATEWAY_TIMEOUT.
+        message:
+          type: string
+        request_id:
+          type: string
+          format: uuid
+        transaction_type:
+          type: string
+        status:
+          type: string
+          enum:
+            - queued
+            - processing
+            - fetching
+            - building_xml
+            - pushing
+            - succeeded
+            - failed
+        attempt_count:
+          type: integer
+        destination:
+          $ref: '#/components/schemas/Destination'
+        error:
+          type: string
+        tally_result:
+          type: object
+          additionalProperties: true
+        sales_order:
+          type: object
+          additionalProperties: true
+        receipt:
+          type: object
+          additionalProperties: true
+        purchase_order:
+          type: object
+          additionalProperties: true
+        purchase:
+          type: object
+          additionalProperties: true
+        payment:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+    PurchaseOrderPush:
+      type: object
+      required:
+        - destination
+        - purchase_order
+      properties:
+        idempotency_key:
+          type: string
+          description: >-
+            Optional retry key, max 200 characters. Reuse only for the same transaction and payload. Use
+            module-specific prefixes. A duplicate returns the saved request; payloads are not compared.
+          maxLength: 200
+        destination:
+          $ref: '#/components/schemas/Destination'
+        purchase_order:
+          type: object
+          required:
+            - date
+            - party
+            - items
+            - order_number
+          properties:
+            voucher_type:
+              type: string
+              default: Purchase Order
+            voucher_number:
+              type: string
+              description: Submitted voucher reference; final Tally numbering may differ.
+            date:
+              type: string
+              description: Real calendar date. Use YYYY-MM-DD in new integrations.
+              format: date
+              example: '2026-10-28'
+            party:
+              $ref: '#/components/schemas/PartyLedger'
+            narration:
+              type: string
+            custom_fields:
+              type: object
+              description: Technical Tally UDF names with scalar values.
+              additionalProperties: {}
+            items:
+              type: array
+              minItems: 1
+              items:
+                $ref: '#/components/schemas/Item'
+            total_amount:
+              type: number
+              minimum: 0
+            purchase_ledger:
+              type: string
+              description: Default purchase ledger; Purchase Voucher needs this or item-level purchase ledgers.
+              example: Purchase
+            order_number:
+              type: string
+              description: >-
+                Required supplier-facing order reference, separate from voucher_number. purchase_order_number
+                is a legacy alias.
+              example: ORDER-1001
+            order_due_date:
+              type: string
+              description: Required here unless all items supply their own valid date. No automatic default.
+              format: date
+              example: '2026-10-28'
+    PurchaseVoucherPush:
+      type: object
+      required:
+        - destination
+        - purchase
+      properties:
+        idempotency_key:
+          type: string
+          description: >-
+            Optional retry key, max 200 characters. Reuse only for the same transaction and payload. Use
+            module-specific prefixes. A duplicate returns the saved request; payloads are not compared.
+          maxLength: 200
+        destination:
+          $ref: '#/components/schemas/Destination'
+        purchase:
+          type: object
+          required:
+            - date
+            - party
+            - items
+          properties:
+            voucher_type:
+              type: string
+              default: Purchase
+            voucher_number:
+              type: string
+              description: Submitted voucher reference; final Tally numbering may differ.
+            date:
+              type: string
+              description: Real calendar date. Use YYYY-MM-DD in new integrations.
+              format: date
+              example: '2026-10-28'
+            party:
+              $ref: '#/components/schemas/PartyLedger'
+            narration:
+              type: string
+            custom_fields:
+              type: object
+              description: Technical Tally UDF names with scalar values.
+              additionalProperties: {}
+            items:
+              type: array
+              minItems: 1
+              items:
+                $ref: '#/components/schemas/Item'
+            total_amount:
+              type: number
+              minimum: 0
+            purchase_ledger:
+              type: string
+              description: Default purchase ledger; Purchase Voucher needs this or item-level purchase ledgers.
+              example: Purchase
+    PaymentVoucherPush:
+      type: object
+      required:
+        - destination
+        - payment
+      properties:
+        idempotency_key:
+          type: string
+          description: >-
+            Optional retry key, max 200 characters. Reuse only for the same transaction and payload. Use
+            module-specific prefixes. A duplicate returns the saved request; payloads are not compared.
+          maxLength: 200
+        destination:
+          $ref: '#/components/schemas/Destination'
+        payment:
+          type: object
+          required:
+            - date
+            - party
+            - payment
+            - amount
+          properties:
+            voucher_type:
+              type: string
+              default: Payment
+            voucher_number:
+              type: string
+              description: Submitted voucher reference; final Tally numbering may differ.
+            date:
+              type: string
+              description: Real calendar date. Use YYYY-MM-DD in new integrations.
+              format: date
+              example: '2026-10-28'
+            party:
+              $ref: '#/components/schemas/PartyLedger'
+            narration:
+              type: string
+            custom_fields:
+              type: object
+              description: Technical Tally UDF names with scalar values.
+              additionalProperties: {}
+            payment:
+              $ref: '#/components/schemas/CashBankLedger'
+            amount:
+              type: number
+              minimum: 0
+              exclusiveMinimum: true
+            bill_reference:
+              type: string
+            bill_type:
+              type: string
+    Balance:
+      type: object
+      properties:
+        amount:
+          type: number
+          minimum: 0
+        type:
+          type: string
+          nullable: true
+          enum:
+            - Dr
+            - Cr
+            - null
+    LedgerEntry:
+      type: object
+      description: Normalized base-currency movement. Optional inventory/bill details come from the synced cache.
+      properties:
+        date:
+          type: string
+          format: date
+        voucher_no:
+          type: string
+        voucher_type:
+          type: string
+        master_id:
+          type: string
+        narration:
+          type: string
+        particulars:
+          type: array
+          items:
+            type: string
+        debit:
+          type: number
+        credit:
+          type: number
+        balance:
+          $ref: '#/components/schemas/Balance'
+        inventory_entries:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        bill_allocations:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    LedgerStatement:
+      type: object
+      properties:
+        company:
+          type: string
+        ledger_name:
+          type: string
+        from_date:
+          type: string
+          format: date
+        to_date:
+          type: string
+          format: date
+        opening_balance:
+          $ref: '#/components/schemas/Balance'
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/LedgerEntry'
+        total_debit:
+          type: number
+        total_credit:
+          type: number
+        closing_balance:
+          $ref: '#/components/schemas/Balance'
+        source:
+          type: string
+          example: local_sqlite
+        last_synced_at:
+          type: string
+          format: date-time
+          nullable: true
+        sync_status:
+          type: string
+        is_stale:
+          type: boolean
+        company_details:
+          type: object
+          additionalProperties: true
+        details_available:
+          type: boolean
+  responses:
+    ValidationError:
+      description: Invalid input. errors includes field paths, including nested item paths.
+      content:
+        application/json:
+          example:
+            success: false
+            code: 2001
+            type: BAD_REQUEST
+            message: Invalid voucher request.
+            errors:
+              - field: sales.items[0].sales_ledger
+                message: Sales ledger is required on the item or sales voucher.
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    ClientUnauthorized:
+      description: Missing or invalid client ID/API key.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            success: false
+            code: 2005
+            type: UNAUTHORIZED
+            message: X-Client-ID and X-API-Key headers are required.
+    ConnectorUnauthorized:
+      description: Missing or invalid Connector credentials.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            success: false
+            code: 2005
+            type: UNAUTHORIZED
+            message: Connector credentials are required.
+    ConsoleUnauthorized:
+      description: Missing, expired, or invalid Admin Console session cookie.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            success: false
+            code: 2401
+            type: UNAUTHORIZED
+            message: Admin Console login required.
+    NotFound:
+      description: Request ID was not found for the authenticated client.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            success: false
+            code: 2004
+            type: NOT_FOUND
+            message: Sales order request not found.
+    ServiceUnavailable:
+      description: Required database or credential email service is unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            success: false
+            code: 2000
+            type: SERVICE_UNAVAILABLE
+            message: Service is temporarily unavailable.
+    ConnectorUnavailable:
+      description: Connector disconnected or unresponsive. New live work is not queued until preflight succeeds.
+      content:
+        application/json:
+          example:
+            success: false
+            code: 2013
+            type: SERVICE_UNAVAILABLE
+            message: Connector is not connected. Start the Connector and connect it to the Server.
+            error_code: CONNECTOR_NOT_CONNECTED
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    TallyUnavailable:
+      description: Connector online but Tally unreachable.
+      content:
+        application/json:
+          example:
+            success: false
+            code: 2014
+            type: SERVICE_UNAVAILABLE
+            message: Tally is not connected.
+            error_code: TALLY_NOT_CONNECTED
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    JobTimeout:
+      description: >-
+        Connector has not completed the job within the configured wait. Work may still finish; read status
+        using request_id before retrying.
+      content:
+        application/json:
+          example:
+            success: false
+            code: 2011
+            type: GATEWAY_TIMEOUT
+            message: >-
+              The Connector has not returned a Tally result before the response timeout. The request remains
+              queued or processing.
+            request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+            status: queued
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    TallyRejected:
+      description: Tally rejected this import. Correct the business data after inspecting error.
+      content:
+        application/json:
+          example:
+            success: false
+            code: 2012
+            type: BAD_GATEWAY
+            message: Tally did not accept the voucher.
+            request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+            status: failed
+            error: Tally returned an import error.
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    AvailabilityTimeout:
+      description: Connection preflight timed out. error_code is TALLY_TIMEOUT or CONNECTOR_CHECK_TIMEOUT.
+      content:
+        application/json:
+          example:
+            success: false
+            code: 2015
+            type: GATEWAY_TIMEOUT
+            message: Tally did not respond before the connection check timed out.
+            error_code: TALLY_TIMEOUT
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    PdfPending:
+      description: Export queued or in progress. Poll the same URL; these are JSON job details, not PDF bytes.
+      content:
+        application/json:
+          example:
+            success: true
+            code: 1002
+            type: ACCEPTED
+            message: Sales Voucher PDF export requested. Poll this endpoint again to download it when ready.
+            request_id: 18771bcc-5374-4c11-8e43-0b930659de08
+            pdf_status: queued
+            connector_notified: true

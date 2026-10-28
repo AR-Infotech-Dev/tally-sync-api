@@ -1,0 +1,76 @@
+openapi: 3.0.3
+info:
+  title: Connector release publishing and download
+  version: 1.0.0
+  description: Operational installer distribution contract, separate from the CRM API reference. No installer is published until its complete streamed upload passes size, executable signature and SHA-256 checks. Versions are immutable per architecture, and latest means the highest numeric stable version.
+paths:
+  /api/v1/connector-releases:
+    post:
+      operationId: publishConnectorRelease
+      summary: Publish a Windows installer from the protected Connector build
+      security: [{releaseToken: []}]
+      parameters:
+        - {name: X-Connector-Version, in: header, required: true, schema: {type: string, pattern: '^(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})$'}, example: 0.0.1}
+        - {name: X-Connector-Arch, in: header, required: true, schema: {type: string, enum: [x64, ia32, arm64]}}
+        - {name: X-Installer-SHA256, in: header, required: true, schema: {type: string, pattern: '^[a-fA-F0-9]{64}$'}}
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: {type: string, format: binary}
+      responses:
+        '201': {description: Installer atomically published, content: {application/json: {schema: {$ref: '#/components/schemas/ReleaseResponse'}}}}
+        '200': {description: Identical version and SHA-256 already published; duplicate is true, content: {application/json: {schema: {$ref: '#/components/schemas/ReleaseResponse'}}}}
+        '400': {description: Invalid version/architecture/checksum, invalid executable signature, interrupted upload, or checksum mismatch}
+        '401': {description: Missing or invalid publishing token}
+        '409': {description: Version and architecture already contain a different installer; increment the Connector package version}
+        '413': {description: Installer exceeds CONNECTOR_RELEASE_MAX_MB, default 300 MB}
+        '415': {description: Content-Type must be application/octet-stream}
+        '503': {description: Publishing token or storage configuration unavailable}
+  /api/v1/connector-releases/latest:
+    get:
+      operationId: getLatestConnectorRelease
+      summary: Read the highest stable published version for one architecture
+      security: []
+      parameters:
+        - {name: arch, in: query, schema: {type: string, enum: [x64, ia32, arm64], default: x64}}
+      responses:
+        '200': {description: Public release metadata with Cache-Control no-store, content: {application/json: {schema: {$ref: '#/components/schemas/ReleaseResponse'}}}}
+        '400': {description: Invalid architecture}
+        '404': {description: No release has been published for the requested architecture}
+  /api/v1/connector-releases/{version}/{architecture}/download:
+    get:
+      operationId: downloadConnectorRelease
+      summary: Download an immutable published installer; HEAD and byte ranges are supported
+      security: []
+      parameters:
+        - {name: version, in: path, required: true, schema: {type: string}, example: 0.0.1}
+        - {name: architecture, in: path, required: true, schema: {type: string, enum: [x64, ia32, arm64]}}
+      responses:
+        '200': {description: Attachment with X-Installer-SHA256 header, content: {application/octet-stream: {schema: {type: string, format: binary}}}}
+        '206': {description: Requested byte range}
+        '400': {description: Invalid version or architecture}
+        '404': {description: Installer not found}
+components:
+  securitySchemes:
+    releaseToken: {type: apiKey, in: header, name: X-Release-Token, description: Server CONNECTOR_RELEASE_TOKEN, at least 32 characters; never ship inside the installer}
+  schemas:
+    ReleaseResponse:
+      type: object
+      properties:
+        success: {type: boolean}
+        code: {type: integer}
+        type: {type: string}
+        message: {type: string}
+        duplicate: {type: boolean, description: Present only in a publish response}
+        release:
+          type: object
+          required: [version, architecture, filename, size_bytes, sha256, published_at, download_url]
+          properties:
+            version: {type: string, example: 0.0.1}
+            architecture: {type: string, enum: [x64, ia32, arm64]}
+            filename: {type: string, example: Flowups-Tally-Sync-Connector-Setup-0.0.1-x64.exe}
+            size_bytes: {type: integer}
+            sha256: {type: string}
+            published_at: {type: string, format: date-time}
+            download_url: {type: string, description: Relative to the publishing API server origin}

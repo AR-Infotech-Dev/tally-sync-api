@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
+import { fileURLToPath } from "node:url";
 import routes from "./routes/index.js";
 import { env } from "#config/env.js";
 import { legacyConfig } from "#config/legacy.js";
@@ -10,8 +11,11 @@ import { corsMiddleware } from "#middlewares/cors.middleware.js";
 import { errorHandler } from "#middlewares/errorHandler.js";
 import consoleRouter from "./modules/console/console.router.js";
 import { recordConsoleLog } from "./modules/console/consoleLog.store.js";
+import connectorReleaseRouter from "./modules/connector-releases/connector-release.router.js";
 
 const app = express();
+const docsIndexPath = fileURLToPath(new URL("../public/docs/site/index.html", import.meta.url));
+app.get(["/docs", "/docs/"], (_req, res) => res.sendFile(docsIndexPath));
 app.use(express.static("public"));
 app.use(corsMiddleware());
 morgan.token("ip", (req) => req.ip);
@@ -28,6 +32,7 @@ app.use(morgan(":ip :method  :url :status  :res[content-length] - :response-time
   },
 }));
 app.use(cookieParser());
+app.use("/api/v1/connector-releases", connectorReleaseRouter);
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true, limit: "20mb" }));
 app.get("/health", (req, res) => {

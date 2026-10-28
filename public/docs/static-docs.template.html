@@ -1,0 +1,350 @@
+<!doctype html>
+<!-- Generated from tally-sync-api.openapi.yaml. Run: node public/docs/build-static-docs.mjs -->
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10151d">
+  <meta name="description"
+    content="Flowups Tally Sync API documentation. Authentication, Sales, Purchases, Receipts, Payments, Ledger Statements, PDF exports, and complete request and response examples.">
+  <meta name="color-scheme" content="dark">
+  <title>Tally Sync API Documentation · Flowups</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232859ad'/%3E%3Cpath d='M8 8h17l-3 6H8V8Zm0 9h11l-3 6H8v-6Z' fill='white'/%3E%3C/svg%3E">
+  <style>
+    /* DOCS_STYLES */
+  </style>
+</head>
+
+<body>
+  <a class="skip-link" href="#main-content">Skip to documentation</a>
+  <header class="topbar">
+    <button class="menu-toggle" type="button" aria-label="Open documentation navigation" aria-controls="sidebar"
+      aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+        aria-hidden="true">
+        <path d="M4 6h16M4 12h16M4 18h16" />
+      </svg></button>
+    <a class="brand" href="#overview" aria-label="Flowups documentation home"><span class="brand-mark"
+        aria-hidden="true"><svg viewBox="0 0 28 28" fill="none">
+          <path d="M7 7h15l-3 5H7V7Zm0 8h10l-3 5H7v-5Z" fill="currentColor" />
+        </svg></span><span class="brand-name">flowups<span class="brand-subtitle">Tally Sync</span></span></a>
+    <span class="header-divider" aria-hidden="true"></span><span class="header-label">Documentation</span><span
+      class="version">v1.0</span>
+    <div class="search-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+        aria-hidden="true">
+        <circle cx="10.5" cy="10.5" r="6.5" />
+        <path d="m16 16 4.5 4.5" />
+      </svg><label class="sr-only" for="search">Search endpoints, fields, or HTTP methods</label><input id="search"
+        type="search" placeholder="Search documentation…" autocomplete="off" spellcheck="false"><kbd
+        class="key-hint">/</kbd></div>
+    <div class="header-actions"><button class="button" type="button" data-download-spec><svg viewBox="0 0 24 24"
+          fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+          <path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4" />
+        </svg><span>OpenAPI</span></button></div>
+  </header>
+  <button class="nav-backdrop" type="button" aria-label="Close documentation navigation" tabindex="-1"></button>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar" aria-label="Documentation navigation">
+      <nav>
+        <p class="nav-label">Getting started</p>
+        <a class="nav-link active" href="#overview">Overview <span>↗</span></a>
+        <a class="nav-link" href="#download-connector">Download Connector</a>
+        <a class="nav-link" href="#quickstart">Quickstart</a>
+        <a class="nav-link" href="#authentication">Authentication</a>
+        <a class="nav-link" href="#request-lifecycle">Requests &amp; retries</a>
+        <a class="nav-link" href="#pdf-exports">PDF exports</a>
+        <a class="nav-link" href="#errors">Errors &amp; status codes</a>
+        <p class="nav-label">API reference <span class="count">{{ENDPOINT_COUNT}}</span></p>
+        {{NAVIGATION}}
+      </nav>
+      <div class="sidebar-footer"><span class="pill">API v1.0</span>
+        <p>CRM ↔ TallyPrime<br>Connected through Flowups.</p>
+        <button class="button" type="button" data-download-spec>Download OpenAPI ↓</button>
+      </div>
+    </aside>
+    <main class="content" id="main-content">
+      <p class="search-status" id="search-status" role="status" aria-live="polite" hidden></p>
+      <section class="hero" id="overview">
+        <p class="eyebrow"><span class="pill">Developer docs</span> TallyPrime integration</p>
+        <h1>Tally Sync <span class="accent">API</span></h1>
+        <p class="lead">Connect your application to TallyPrime. Create vouchers, read ledger statements, and export
+          invoice PDFs through one consistent API.</p>
+        <div class="hero-actions"><a class="button primary" href="#quickstart">Make your first request <span
+              aria-hidden="true">→</span></a><a class="button" href="#group-sales-vouchers">Explore API reference</a>
+        </div>
+        <div class="stats">
+          <div><strong>{{ENDPOINT_COUNT}}</strong><span>Documented endpoints</span></div>
+          <div><strong>6</strong><span>Voucher &amp; order types</span></div>
+          <div><strong>JSON + PDF</strong><span>Integration formats</span></div>
+        </div>
+        <div class="base-url"><span class="section-kicker">Production base URL</span><code>{{BASE_URL}}</code></div>
+      </section>
+      <section class="guide connector-download" id="download-connector" data-api-base="{{BASE_URL}}" aria-labelledby="connector-download-title" aria-busy="true">
+        <div class="connector-download-heading">
+          <div><p class="section-kicker">Windows application</p><h2 id="connector-download-title">Download Connector</h2></div>
+          <span class="pill">TallyPrime Connector</span>
+        </div>
+        <p class="section-description">Install the Connector on the Windows computer running TallyPrime, then follow the setup instructions in your registration email.</p>
+        <div class="connector-download-card">
+          <div class="connector-download-controls">
+            <label for="connector-architecture">Windows version
+              <select id="connector-architecture"><option value="x64">64-bit Windows (x64)</option><option value="ia32">32-bit Windows (x86)</option></select>
+            </label>
+            <button class="button" type="button" id="connector-release-refresh">Check again</button>
+          </div>
+          <p class="connector-release-status" id="connector-release-status" role="status" aria-live="polite">Checking the latest installer…</p>
+          <div id="connector-release-details" hidden>
+            <dl class="connector-release-meta"><div><dt>Latest version</dt><dd id="connector-release-version"></dd></div><div><dt>Installer size</dt><dd id="connector-release-size"></dd></div><div><dt>Published</dt><dd id="connector-release-published"></dd></div></dl>
+            <div class="connector-download-actions"><a class="button primary" id="connector-installer-download" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg><span>Download Windows installer</span></a><span class="muted" id="connector-release-filename"></span></div>
+            <details class="connector-checksum"><summary>Verify installer checksum</summary><p>SHA-256</p><code id="connector-release-sha256"></code></details>
+          </div>
+          <noscript><p class="muted">Enable JavaScript to check available Connector releases and display the download link.</p></noscript>
+        </div>
+      </section>
+      <div class="intro-grid" id="quickstart">
+        <section class="quickstart-card">
+          <p class="section-kicker">Up and running</p>
+          <h2>Your first integration</h2>
+          <div class="step"><span class="step-number">1</span>
+            <div class="step-content">
+              <h3>Register your application</h3>
+              <p><a href="#op-registerclient">Register a client</a> with your Tally license number. Your client ID,
+                and application API key are sent by email.</p>
+            </div>
+          </div>
+          <div class="step"><span class="step-number">2</span>
+            <div class="step-content">
+              <h3>Connect TallyPrime</h3>
+              <p>Set up the desktop Connector on the Tally computer using the instructions in your registration email.
+                Configure Tally and open the company you want to sync.</p>
+            </div>
+          </div>
+          <div class="step"><span class="step-number">3</span>
+            <div class="step-content">
+              <h3>Send an authenticated request</h3>
+              <p>Send your client ID and application key in the headers. Start with a ledger statement after the
+                Connector completes its initial sync.</p>
+            </div>
+          </div>
+          <p class="muted">Examples use demo values. Replace company, ledger, stock item, and voucher references with
+            the exact names in your Tally company.</p>
+        </section>
+        <div class="code-panel">
+          <div class="code-heading"><span>First request · cURL</span><button class="copy-button" type="button"
+              aria-label="Copy quickstart request"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="1.6" aria-hidden="true">
+                <rect x="8" y="8" width="12" height="12" rx="2" />
+                <path d="M16 8V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h4" />
+              </svg>Copy</button></div>
+          <pre><code>curl --request POST \
+  '{{BASE_URL}}/api/v1/ledgers/statement' \
+  --header "Content-Type: application/json" \
+  --header "X-Client-ID: $CLIENT_ID" \
+  --header "X-API-Key: $API_KEY" \
+  --data '{
+    "company": "Demo Company",
+    "ledger_name": "Demo Customer",
+    "from_date": "2026-10-01",
+    "to_date": "2026-10-28"
+  }'</code></pre>
+          <div class="code-caption">Read a statement from the Connector’s synced ledger cache.</div>
+        </div>
+      </div>
+      <section class="guide" id="authentication">
+        <p class="section-kicker">Access</p>
+        <h2>Authentication</h2>
+        <p class="section-description">Use your client ID and application API key for authenticated requests.</p>
+        <div class="guide-grid">
+          <div class="info-card"><span class="pill">Application / CRM</span>
+            <h3>Client API key</h3>
+            <p>Send both headers on every client endpoint:</p>
+            <div class="field-list">
+              <div class="field"><code class="field-name">X-Client-ID</code>
+                <div class="field-description">Client ID from the registration email.</div>
+              </div>
+              <div class="field"><code class="field-name">X-API-Key</code>
+                <div class="field-description">Your application API key. No additional API secret or Bearer token is
+                  required.</div>
+              </div>
+            </div>
+          </div>
+          <div class="info-card"><span class="pill">Public endpoints</span>
+            <h3>No credentials required</h3>
+            <p><code>POST /api/v1/clients/register</code> registers your application, and <code>GET /health</code>
+              checks API server availability. Both endpoints can be called without authentication headers.</p>
+            <p>Registration sends your credentials to the submitted email address. Keep those credentials for
+              authenticated application requests.</p>
+          </div>
+        </div>
+        <div class="callout">
+          <p class="callout-title">Keep your API key on your application server</p>
+          <p>Use environment variables for credentials. Code examples contain placeholders; API credentials are never
+            entered into this documentation page. Registration and health checks are public.</p>
+        </div>
+      </section>
+      <section class="guide" id="request-lifecycle">
+        <p class="section-kicker">Integration behavior</p>
+        <h2>Requests, results &amp; retries</h2>
+        <p class="section-description">Your application calls the cloud API. The desktop Connector communicates with
+          TallyPrime on the customer’s computer.</p>
+        <div class="flow" aria-label="Request flow: your application to Flowups API to desktop Connector to TallyPrime">
+          <span class="flow-node">Your application</span><span class="flow-arrow" aria-hidden="true">→</span><span
+            class="flow-node">Flowups API</span><span class="flow-arrow" aria-hidden="true">→</span><span
+            class="flow-node">Desktop Connector</span><span class="flow-arrow" aria-hidden="true">→</span><span
+            class="flow-node">TallyPrime</span>
+        </div>
+        <div class="guide-grid">
+          <div class="info-card">
+            <h3>Push requests wait for Tally</h3>
+            <p>The six voucher and order push endpoints return <code>200</code> after Tally accepts the transaction,
+              <code>502</code> if Tally rejects it, or <code>504</code> if the wait expires. The default wait is 120
+              seconds.
+            </p>
+            <p>Jobs progress through <code>queued</code>, <code>fetching</code>, <code>building_xml</code>,
+              <code>pushing</code>, then <code>succeeded</code> or <code>failed</code>.
+            </p>
+          </div>
+          <div class="info-card">
+            <h3>A timeout can leave work in progress</h3>
+            <p>Use the returned <code>request_id</code> to read the matching status endpoint before submitting again.
+              Sales Order and ledger status URLs end in <code>/status</code>; other voucher status URLs use the request
+              ID directly.</p>
+            <p>Reuse an <code>idempotency_key</code> only for the same transaction. A duplicate returns the saved job;
+              it does not replace the payload or restart a failed import.</p>
+          </div>
+        </div>
+        <div class="field-list">
+          <div class="field"><code class="field-name">Company selection</code>
+            <div class="field-description">For imports, the company configured in the Connector takes precedence over
+              <code>destination.company</code>. Direct lookups and ledger statements honor an explicit company.
+            </div>
+          </div>
+          <div class="field"><code class="field-name">Order due dates</code>
+            <div class="field-description">Sales Orders and Purchase Orders need an <code>order_due_date</code> on the
+              order or every item, using a real <code>YYYY-MM-DD</code> date. Purchase Order <code>order_number</code>
+              is a separate supplier-facing reference.</div>
+          </div>
+          <div class="field"><code class="field-name">Voucher numbering</code>
+            <div class="field-description">A successful push may return <code>voucher_number: null</code> if the
+              assigned Tally number could not be confirmed. <code>submitted_voucher_number</code> records the caller’s
+              reference.</div>
+          </div>
+          <div class="field"><code class="field-name">Connector availability</code>
+            <div class="field-description">Live pushes and voucher lookups require a responsive Connector and Tally.
+              Saved status records and completed invoice PDFs can be read without a live Tally connection.</div>
+          </div>
+        </div>
+        <div class="callout">
+          <p class="callout-title">Ledger statements use the synced cache</p>
+          <p>The Connector must remain running and have a completed company snapshot. Tally can be offline after that
+            sync. Inspect <code>last_synced_at</code>, <code>sync_status</code>, and <code>is_stale</code> before
+            relying on freshness. An uninitialized snapshot returns <code>503</code>. The default ledger response wait
+            is 15 seconds.</p>
+        </div>
+      </section>
+      <section class="guide" id="pdf-exports">
+        <p class="section-kicker">Documents</p>
+        <h2>Two PDF flows</h2>
+        <div class="guide-grid">
+          <div class="info-card"><span class="pill">Sales invoice</span>
+            <h3>Export the invoice printed by Tally</h3>
+            <p>Call <code>GET /api/v1/sales/pdf</code> with company, ledger, and voucher number, or
+              <code>GET /api/v1/sales/{requestId}/pdf</code> for a successful Sales import.
+            </p>
+            <p><code>202</code> means the PDF is being prepared. Poll the same URL until <code>200</code> returns
+              <code>application/pdf</code>. A failed export returns <code>424</code>; correct the problem and use
+              <code>retry=true</code> for another attempt.
+            </p>
+          </div>
+          <div class="info-card"><span class="pill">Ledger statement</span>
+            <h3>Generate a report from the synced data</h3>
+            <p>Call <code>POST /api/v1/ledgers/statement/pdf</code> with the same body as the JSON statement, or add
+              <code>?format=pdf</code> to the JSON statement URL.
+            </p>
+            <p>Use <code>report_format: "detailed"</code> for item and bill details available in the cache. Individual
+              display flags use strings <code>"yes"</code> or <code>"no"</code>. These flags control PDF presentation.
+            </p>
+          </div>
+        </div>
+        <p class="section-description">Check the HTTP status and <code>Content-Type</code> before saving a PDF. Errors
+          and pending exports return JSON. In JavaScript use a Blob or ArrayBuffer for a successful PDF response; in
+          Python use <code>response.content</code>.</p>
+      </section>
+      <section class="guide" id="errors">
+        <p class="section-kicker">Troubleshooting</p>
+        <h2>Responses &amp; errors</h2>
+        <p class="section-description">Most JSON responses include <code>success</code>, <code>code</code>,
+          <code>type</code>, and <code>message</code>. Voucher fields are at the top level. Ledger statement JSON places
+          the report inside <code>data</code>; ledger status places it inside <code>statement</code>.
+        </p>
+        <div class="guide-grid">
+          <div class="field-list">
+            <div class="field"><code class="field-name">200 / 201</code>
+              <div class="field-description">Successful request / client registered.</div>
+            </div>
+            <div class="field"><code class="field-name">202</code>
+              <div class="field-description">Invoice PDF pending. Poll the same PDF URL.</div>
+            </div>
+            <div class="field"><code class="field-name">400 / 401</code>
+              <div class="field-description">Invalid fields / missing or invalid credentials.</div>
+            </div>
+            <div class="field"><code class="field-name">404 / 409</code>
+              <div class="field-description">Record or voucher not found / conflict, duplicate license, ambiguous
+                lookup, or PDF source not ready.</div>
+            </div>
+            <div class="field"><code class="field-name">424 / 429</code>
+              <div class="field-description">Tally PDF export failed / registration rate limit
+                reached.</div>
+            </div>
+            <div class="field"><code class="field-name">502 / 503 / 504</code>
+              <div class="field-description">Tally rejected work or upstream failed / service, Connector, or cache
+                unavailable / response or connection check timed out.</div>
+            </div>
+          </div>
+          <div class="code-panel">
+            <div class="code-heading"><span>Validation error · HTTP 400</span><button type="button" class="copy-button"
+                aria-label="Copy validation error">Copy</button></div>
+            <pre>
+              <code>
+                {
+                  "success": false,
+                  "code": 2001,
+                  "type": "BAD_REQUEST",
+                  "message": "Invalid sales order request.",
+                  "errors": [
+                    {
+                      "field": "sales_order.items[0].order_due_date",
+                      "message": "order_due_date is required on the item or order header."
+                    }
+                  ]
+                }
+              </code>
+            </pre>
+            <div class="code-caption">Illustrative error shape. Actual field paths and messages identify the failing
+              field.</div>
+          </div>
+        </div>
+        <p class="muted">Connection errors may include <code>CONNECTOR_NOT_CONNECTED</code>,
+          <code>CONNECTOR_NOT_RESPONDING</code>, <code>TALLY_NOT_CONNECTED</code>, <code>TALLY_TIMEOUT</code>, or
+          <code>CONNECTOR_CHECK_TIMEOUT</code>. Follow the endpoint’s status and message when deciding whether to retry.
+        </p>
+      </section>
+      <div class="empty-state" id="no-results" hidden>
+        <h2>No matching endpoints</h2>
+        <p>Try “sales”, “ledger”, a field name, or an HTTP method. Press Escape to clear your search.</p>
+      </div>
+      {{API_REFERENCE}}
+      <footer class="doc-footer"><span>flowups · Tally Sync API</span><span>Reference v1.0 · Updated 28 October
+          2026</span><a href="#overview">Back to top ↑</a></footer>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <noscript>
+    <p class="noscript-note">The complete reference is available below. Enable JavaScript to use search, code tabs,
+      copying, and the OpenAPI download.</p>
+  </noscript>
+  <script type="application/json" id="openapi-spec">{{SPEC_JSON}}</script>
+  <script>/* DOCS_SCRIPT */</script>
+</body>
+
+</html>
