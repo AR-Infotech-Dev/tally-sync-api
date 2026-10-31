@@ -25,8 +25,8 @@ export function validateReceiptVoucherRequest(input = {}) {
   const errors = [];
   const receipt = body.receipt;
 
-  if (!isObject(body.destination) || !(body.destination.company || body.destination.company_name)) {
-    errors.push({ field: "destination.company", message: "Tally company name is required." });
+  if (!isObject(body.destination) || typeof body.destination.company_id !== "string" || !body.destination.company_id.trim()) {
+    errors.push({ field: "destination.company_id", message: "A valid Tally company_id is required." });
   }
   if (!isObject(receipt) || Object.keys(receipt).length === 0) {
     errors.push({ field: "receipt", message: "Receipt voucher data must be a non-empty JSON object." });
@@ -37,8 +37,8 @@ export function validateReceiptVoucherRequest(input = {}) {
   if (!isValidDate(date)) {
     errors.push({ field: "receipt.date", message: "A valid voucher date is required. Use YYYY-MM-DD, YYYYMMDD, or DD-MM-YYYY." });
   }
-  if (!(receipt.party?.ledger_name || receipt.party_ledger)) {
-    errors.push({ field: "receipt.party.ledger_name", message: "Customer ledger name is required." });
+  if (!(receipt.party?.dealer_code || receipt.dealer_code || receipt.party?.ledger_name || receipt.party_ledger)) {
+    errors.push({ field: "receipt.party.dealer_code", message: "Customer dealer_code or ledger_name is required." });
   }
   if (!(receipt.payment?.ledger_name || receipt.payment_ledger)) {
     errors.push({ field: "receipt.payment.ledger_name", message: "Cash or bank ledger name is required." });

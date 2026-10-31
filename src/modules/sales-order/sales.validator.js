@@ -3,8 +3,8 @@ const isObject = (value) => value !== null && typeof value === "object" && !Arra
 
 export function validateSalesOrderRequest(body = {}) {
   const errors = [];
-  if (!isObject(body.destination) || Object.keys(body.destination).length === 0) {
-    errors.push({ field: "destination", message: "Destination details are required." });
+  if (!isObject(body.destination) || typeof body.destination.company_id !== "string" || !body.destination.company_id.trim()) {
+    errors.push({ field: "destination.company_id", message: "A valid Tally company_id is required." });
   }
   if (!isObject(body.sales_order) || Object.keys(body.sales_order).length === 0) {
     errors.push({ field: "sales_order", message: "Sales order data must be a non-empty JSON object." });

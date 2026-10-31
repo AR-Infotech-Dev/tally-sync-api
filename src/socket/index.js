@@ -57,3 +57,16 @@ export const emitToConnector = (clientId, event, payload = {}) => {
     io.to(roomName).emit(event, payload);
     return true;
 };
+
+export function requestConnector(clientId, event, payload = {}, timeoutMs = 10_000) {
+    if (!io || !clientId || !event) return Promise.reject(Object.assign(new Error("Connector is not available."), { code: "CONNECTOR_NOT_CONNECTED" }));
+    const socket = [...io.sockets.sockets.values()].find((candidate) => candidate.connected && candidate.data?.clientId === clientId && candidate.data?.connectorId);
+    if (!socket) return Promise.reject(Object.assign(new Error("Connector is not connected."), { code: "CONNECTOR_NOT_CONNECTED" }));
+    return new Promise((resolve, reject) => {
+        socket.timeout(timeoutMs).emit(event, payload, (error, response) => {
+            if (error) return reject(Object.assign(new Error("Connector did not respond before timeout."), { code: "CONNECTOR_CHECK_TIMEOUT" }));
+            if (!response?.success) return reject(Object.assign(new Error(response?.message || "Connector could not return company data."), { code: response?.code || "COMPANY_LIST_FAILED" }));
+            resolve(response);
+        });
+    });
+}

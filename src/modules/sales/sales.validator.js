@@ -43,7 +43,10 @@ function isRealDate(value) {
 }
 
 function getPartyLedger(sales) {
-  return sales.party_ledger
+  return sales.party?.dealer_code
+    || sales.dealer_code
+    || sales.party_dealer_code
+    || sales.party_ledger
     || sales.party_name
     || sales.customer_ledger
     || sales.customer_name
@@ -56,8 +59,8 @@ export function validateSalesVoucherRequest(input = {}) {
   const errors = [];
   const sales = body.sales;
 
-  if (!isObject(body.destination) || !(body.destination.company || body.destination.company_name)) {
-    errors.push({ field: "destination.company", message: "Tally company name is required." });
+  if (!isObject(body.destination) || typeof body.destination.company_id !== "string" || !body.destination.company_id.trim()) {
+    errors.push({ field: "destination.company_id", message: "A valid Tally company_id is required." });
   }
   if (!isObject(sales) || Object.keys(sales).length === 0) {
     errors.push({ field: "sales", message: "Sales voucher data must be a non-empty JSON object." });
@@ -69,7 +72,7 @@ export function validateSalesVoucherRequest(input = {}) {
     errors.push({ field: "sales.date", message: "A valid voucher date is required. Use YYYY-MM-DD, YYYYMMDD, or DD-MM-YYYY." });
   }
   if (!getPartyLedger(sales)) {
-    errors.push({ field: "sales.party_ledger", message: "Customer ledger is required." });
+    errors.push({ field: "sales.party.dealer_code", message: "Customer dealer_code or ledger_name is required." });
   }
   if (sales.total_amount !== undefined && (!Number.isFinite(Number(sales.total_amount)) || Number(sales.total_amount) < 0)) {
     errors.push({ field: "sales.total_amount", message: "Total amount must be a zero or positive number." });

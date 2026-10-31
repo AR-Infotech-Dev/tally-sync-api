@@ -52,10 +52,11 @@ export const pushSalesOrder = asyncHandler(async (req, res) => {
     });
   }
   if (completion.request.status === "failed") {
+    const lookupStatus = completion.request.tally_result?.lookup_status || 502;
     return failureResponse(res, {
       code: 2012,
-      httpStatus: 502,
-      message: "Tally did not accept the Sales Order.",
+      httpStatus: lookupStatus,
+      message: lookupStatus === 404 || lookupStatus === 409 ? completion.request.error || "Company validation failed." : "Tally did not accept the Sales Order.",
       data: { request_id: completion.request.request_id, status: completion.request.status, error: completion.request.error },
     });
   }

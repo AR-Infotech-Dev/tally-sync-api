@@ -24,13 +24,13 @@ export function validatePurchaseRequest(body = {}, kind) {
   if (!config) return [{ field: "transaction_type", message: "Unsupported purchase transaction." }];
   const errors = [];
   const voucher = body[config.field];
-  if (!isObject(body.destination) || !(body.destination.company || body.destination.company_name)) errors.push({ field: "destination.company", message: "Tally company name is required." });
+  if (!isObject(body.destination) || typeof body.destination.company_id !== "string" || !body.destination.company_id.trim()) errors.push({ field: "destination.company_id", message: "A valid Tally company_id is required." });
   if (!isObject(voucher) || Object.keys(voucher).length === 0) {
     errors.push({ field: config.field, message: `${config.label} data must be a non-empty JSON object.` });
     return errors;
   }
   if (!validDate(voucher.date || voucher.voucher_date || voucher.order_date)) errors.push({ field: `${config.field}.date`, message: "A valid voucher date is required (YYYY-MM-DD, YYYYMMDD, or DD-MM-YYYY)." });
-  if (!(voucher.party?.ledger_name || voucher.party_ledger || voucher.supplier_ledger || voucher.supplier_name)) errors.push({ field: `${config.field}.party.ledger_name`, message: "Supplier ledger name is required." });
+  if (!(voucher.party?.dealer_code || voucher.dealer_code || voucher.party_dealer_code || voucher.party?.ledger_name || voucher.party_ledger || voucher.supplier_ledger || voucher.supplier_name)) errors.push({ field: `${config.field}.party.dealer_code`, message: "Supplier dealer_code or ledger_name is required." });
   if (kind === "purchase_order" && !(voucher.order_number || voucher.purchase_order_number)) errors.push({ field: "purchase_order.order_number", message: "Purchase order number is required. This is the supplier-facing order reference, separate from voucher_number." });
   if(kind === 'purchase_order') errors.push(...validateOrderDueDates(voucher,'purchase_order'));
   if (config.items) {

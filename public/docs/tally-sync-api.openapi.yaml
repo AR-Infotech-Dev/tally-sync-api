@@ -24,6 +24,7 @@ tags:
   - name: Purchase Orders
   - name: Purchase Vouchers
   - name: Payment Vouchers
+  - name: Companies
   - name: Ledger Statements
   - name: Admin Console
     description: Administrative session endpoints, separate from CRM API keys.
@@ -93,6 +94,40 @@ paths:
         '429':
           description: Too many activation attempts.
       x-audience: public
+  /api/v1/companies:
+    get:
+      tags:
+        - Companies
+      summary: List companies available to the authenticated client
+      operationId: listCompanies
+      security:
+        - clientId: []
+          clientApiKey: []
+      description: >-
+        Returns stable system company_id values for companies present in the Connector local SQLite snapshot.
+        Use destination.company_id on data push requests. A company is active only after its local snapshot is
+        ready; inactive companies are returned for visibility but must not receive new work.
+      responses:
+        '200':
+          description: Company list retrieved from Connector cache.
+          content:
+            application/json:
+              example:
+                success: true
+                code: 1000
+                type: OK
+                message: Companies retrieved from the Connector cache.
+                companies:
+                  - company_id: COMP_01JABC123
+                    company_name: Demo Company
+                    tally_guid: 646d1f1a-2756-424a-bc49-000000000001
+                    status: active
+                    last_synced_at: '2026-10-30T08:00:00.000Z'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '503':
+          $ref: '#/components/responses/ConnectorUnavailable'
+      x-audience: application
   /api/v1/ledgers/statement/pdf:
     post:
       tags:
@@ -103,7 +138,7 @@ paths:
         - clientId: []
           clientApiKey: []
       description: >-
-        Uses the same company, ledger_name, from_date and to_date body as the JSON statement endpoint. Returns
+        Uses the same company, dealer_code/ledger_name, from_date and to_date body as the JSON statement endpoint. Dealer code takes priority; ledger_name is the fallback. Returns
         a downloadable PDF with repeated headers, period balances, transactions and freshness metadata. No
         extra Tally export occurs. Use is_detailed: "no" (default) for condensed voucher rows or "yes" for
         item quantity/rate/amount and bill-reference breakup from the synced cache. Errors remain JSON. PDF
@@ -175,14 +210,17 @@ paths:
             schema:
               type: object
               required:
-                - ledger_name
                 - from_date
                 - to_date
               properties:
                 company:
                   type: string
+                dealer_code:
+                  type: string
+                  description: Exact Dealer Code from the Tally ledger UDF. Takes priority over ledger_name.
                 ledger_name:
                   type: string
+                  description: Exact ledger name fallback when dealer_code is omitted.
                 from_date:
                   type: string
                   format: date
@@ -2501,24 +2539,30 @@ components:
           type: string
     Destination:
       type: object
-      required:
-        - company
       description: >-
-        Exact Tally company name. A company configured in Connector settings takes precedence for voucher
-        imports. company_name remains a legacy alias.
       properties:
+        company_id:
+          type: string
+          description: Stable system company ID returned by GET /api/v1/companies. Takes priority over company.
+          example: COMP_01JABC123
         company:
           type: string
-          description: Exact company name.
+          description: Legacy exact company name fallback when company_id is omitted.
           example: Demo Company
     PartyLedger:
       type: object
-      required:
-        - ledger_name
+      description: >-
+        Identify the customer or supplier by dealer_code when available. Dealer code has priority over
+        ledger_name. If dealer_code is omitted, ledger_name is used as the legacy fallback.
       properties:
+        dealer_code:
+          type: string
+          maxLength: 500
+          description: Exact Dealer Code value from the Tally ledger TDL field. Takes priority over ledger_name.
+          example: DL-10045
         ledger_name:
           type: string
-          description: Exact customer or supplier ledger name in the selected Tally company.
+          description: Exact customer or supplier ledger name in the selected Tally company; fallback when dealer_code is not supplied.
           example: Demo Customer
         group:
           type: string
