@@ -4,6 +4,7 @@ const balance = (value) => `${money(value?.amount)}${value?.type ? ` ${value.typ
 const date = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value || "") ? `${Number(value.slice(8))}-${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][Number(value.slice(5, 7)) - 1]}-${value.slice(2, 4)}` : String(value || "-");
 export function buildGroupSummaryPdfData(summary, input = {}) {
   const options = normalizeGroupSummaryPdfOptions(input);
+  summary = { ...summary, company_details: { ...summary.company_details, address: [...(summary.company_details?.address || []), summary.company_details?.pincode].filter(Boolean) } };
   const scale = options.scale_factor === "default" ? 1 : Number(options.scale_factor) || 1;
   const amount = (value) => Number(value || 0) / scale;
   const pct = (value, total) => options.show_percentages ? ` (${((Math.abs(Number(value || 0)) / (Math.abs(Number(total || 0)) || 1)) * 100).toFixed(2)}%)` : "";

@@ -5,6 +5,7 @@ import { JSDOM } from "jsdom";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
+import { buildOutstandingAmounts } from "./outstanding-pdf.utils.js";
 const require = createRequire(import.meta.url);
 const fontRoot = path.join(path.dirname(require.resolve("@fontsource/noto-sans-devanagari/package.json")), "files");
 const normal = path.join(fontRoot, "noto-sans-devanagari-latin-400-normal.woff");
@@ -12,13 +13,21 @@ const bold = path.join(fontRoot, "noto-sans-devanagari-latin-700-normal.woff");
 pdfmake.addFonts({ Statement: { normal, bold, italics: normal, bolditalics: bold } });
 pdfmake.addTableLayouts({ ledgerStatement: { defaultBorder: false, hLineWidth: (i, n) => i === 0 || i === 1 || i === n.table.body.length - 1 ? 0.5 : 0, vLineWidth: () => 0, paddingLeft: () => 4, paddingRight: () => 4, paddingTop: () => 3, paddingBottom: () => 3 } });
 const money = (value) => Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const displayDate = (value) => { const raw = String(value || "").trim(); const match = raw.match(/^(\d{4})[-/]?(\d{2})[-/]?(\d{2})$/) || raw.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/); if (!match) return raw || "-"; const y = match[1].length === 4 ? match[1] : match[3]; const m = match[2]; const d = match[1].length === 4 ? match[3] : match[1]; return `${d}-${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][Number(m) - 1]}-${y.slice(2)}`; };
+
 export async function generateOutstandingPdf(report) {
   const template = await readFile(new URL("../../templates/outstanding.hbs", import.meta.url), "utf8");
   const options = report.pdf_options || {};
-  const flags = { show_company_name: options.show_company_name !== "no", show_opening_amount: options.show_opening_amount !== "no", show_pending_amount: options.show_pending_amount !== "no", show_due_date: options.show_due_date !== "no", show_overdue_days: options.show_overdue_days !== "no" };
-  const bills = (report.bills || []).map((row) => ({ ...row, opening_amount: money(row.opening_amount ?? row.amount), pending_amount: money(row.pending_amount ?? row.amount), amount: money(row.amount), due_date: row.due_date || "-", overdue_days: row.overdue_days ?? 0 }));
+  const details = report.company_details || {};
+  const addressLines = (Array.isArray(details.address) ? details.address : details.address ? [details.address] : []).map((line) => String(line).trim()).filter(Boolean);
+  const pincode = String(details.pincode || "").trim();
+  if (pincode && !addressLines.some((line) => line.includes(pincode))) addressLines.push(pincode);
+  report = { ...report, company_address: options.show_company_address === "no" ? "" : [...new Set(addressLines)].join(", ") || report.company_address, company_email: details.email || report.company_email, company_phone: details.phone || report.company_phone };
+  const flags = { show_company_name: options.show_company_name !== "no", show_opening_amount: options.show_opening_amount !== "no", show_pending_amount: options.show_pending_amount !== "no", show_due_date: options.show_due_on !== "no" && options.show_due_date !== "no", show_overdue_days: options.show_no_of_days_till_due_date === "yes" || options.show_overdue_days === "yes", show_narrations: options.show_narrations === "yes", show_order_number: options.show_order_number_details === "yes", show_inventory: options.show_inventory_details === "yes" };
+  const amounts = buildOutstandingAmounts(report.bills);
+  const bills = amounts.bills.map((row) => ({ ...row, amount: money(row.amount), due_date: displayDate(row.due_date), overdue_days: row.overdue_days ?? row.days_till_due_date ?? 0, narration: row.narration || "", order_number: row.order_number || "" }));
   const widths = [55, "*"]; if (flags.show_opening_amount) widths.push(90); if (flags.show_pending_amount) widths.push(90); if (flags.show_due_date) widths.push(65); if (flags.show_overdue_days) widths.push(60);
-  const html = Handlebars.compile(template)({ ...report, ...flags, table_widths: JSON.stringify(widths), bills, total: money(report.total), total_opening: money(report.total_opening ?? report.total) });
+  const html = Handlebars.compile(template)({ ...report, ...flags, from_date: displayDate(report.from_date), as_of_date: displayDate(report.as_of_date), report_type_label: options.report_type || "Ledger Outstanding", type_of_bills_label: options.type_of_bills || "Pending Bills", table_widths: JSON.stringify(widths), bills, total: amounts.total, total_opening: amounts.total_opening });
   const { window } = new JSDOM("");
-  try { const content = htmlToPdfmake(html, { window, removeExtraBlanks: true, defaultStyles: { th: { bold: true, fillColor: "#ffffff" } } }); const table = content.find((node) => node?.table); if (table?.table?.body?.[0]) table.table.body[0].forEach((cell) => { if (cell && typeof cell === "object") { cell.border = [false, true, false, true]; cell.fillColor = "#ffffff"; } }); return Buffer.from(await pdfmake.createPdf({ pageSize: "A4", pageMargins: [36, 32, 36, 36], defaultStyle: { font: "Statement", fontSize: 9 }, content }).getBuffer()); } finally { window.close(); }
+  try { const content = htmlToPdfmake(html, { window, removeExtraBlanks: true, defaultStyles: { p: { margin: [0, 0, 0, 2] }, h1: { margin: [0, 0, 0, 3] }, th: { bold: true, fillColor: "#ffffff" } } }); const table = content.find((node) => node?.table); if (table?.table?.body?.[0]) table.table.body[0].forEach((cell) => { if (cell && typeof cell === "object") { cell.border = [false, true, false, true]; cell.fillColor = "#ffffff"; } }); return Buffer.from(await pdfmake.createPdf({ pageSize: "A4", pageMargins: [36, 32, 36, 36], defaultStyle: { font: "Statement", fontSize: 9 }, content }).getBuffer()); } finally { window.close(); }
 }

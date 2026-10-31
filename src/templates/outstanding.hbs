@@ -1,7 +1,109 @@
-<!doctype html><html><head><meta charset="utf-8"><title>Outstanding Report</title></head><body>
-{{#if show_company_name}}<h1 style="text-align:center">{{company}}</h1>{{/if}}{{#if company_address}}<p style="text-align:center;margin:0">{{company_address}}</p>{{/if}}{{#if company_phone}}<p style="text-align:center;margin:0">Contact : {{company_phone}}</p>{{/if}}{{#if company_email}}<p style="text-align:center;margin:0">E-Mail : {{company_email}}</p>{{/if}}
-<p style="text-align:center"><strong>{{ledger_name}}</strong><br>Bill-wise Details<br>{{from_date}} to {{as_of_date}}<br><strong>Pending Bills</strong></p>
-<table data-pdfmake='{"widths":{{table_widths}},"headerRows":1,"layout":"ledgerStatement"}'><thead><tr><th data-pdfmake='{"border":[false,true,false,true],"fillColor":"#ffffff"}'>Date</th><th data-pdfmake='{"border":[false,true,false,true],"fillColor":"#ffffff"}'>Ref. No.</th>{{#if show_opening_amount}}<th data-pdfmake='{"border":[false,true,false,true],"fillColor":"#ffffff"}'>Opening<br>Amount</th>{{/if}}{{#if show_pending_amount}}<th data-pdfmake='{"border":[false,true,false,true],"fillColor":"#ffffff"}'>Pending<br>Amount</th>{{/if}}{{#if show_due_date}}<th data-pdfmake='{"border":[false,true,false,true],"fillColor":"#ffffff"}'>Due on</th>{{/if}}{{#if show_overdue_days}}<th data-pdfmake='{"border":[false,true,false,true],"fillColor":"#ffffff"}'>Overdue<br>by days</th>{{/if}}</tr></thead><tbody>
-{{#each bills}}<tr><td>{{date}}</td><td>{{reference}}<br><small>{{voucher_no}}</small></td>{{#if ../show_opening_amount}}<td style="text-align:right">{{opening_amount}}</td>{{/if}}{{#if ../show_pending_amount}}<td style="text-align:right"><strong>{{pending_amount}}</strong></td>{{/if}}{{#if ../show_due_date}}<td>{{due_date}}</td>{{/if}}{{#if ../show_overdue_days}}<td style="text-align:right">{{overdue_days}}</td>{{/if}}</tr>{{/each}}
-<tr><td colspan="2"><strong>Total</strong></td>{{#if show_opening_amount}}<td style="text-align:right"><strong>{{total_opening}}</strong></td>{{/if}}{{#if show_pending_amount}}<td style="text-align:right"><strong>{{total}}</strong></td>{{/if}}{{#if show_due_date}}<td></td>{{/if}}{{#if show_overdue_days}}<td></td>{{/if}}</tr>
-</tbody></table></body></html>
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Outstanding Report</title>
+</head>
+
+<body>
+    {{#if show_company_name}}
+    <h1 style="text-align:center; font-size: 20px" data-pdfmake='{"margin":[0,0,0,3]}'>{{company}}</h1>
+    {{/if}}
+    {{#if company_address}}
+    <p style="text-align:center;margin:0">{{company_address}}</p>
+    {{/if}}
+    {{#if company_phone}}
+    <p style="text-align:center;margin:0">Contact : {{company_phone}}</p>
+    {{/if}}
+    {{#if company_email}}
+    <p style="text-align:center;margin:0">E-Mail : {{company_email}}</p>
+    {{/if}}
+    <p style="text-align:center" data-pdfmake='{"margin":[0,4,0,8]}'>
+        <strong>{{ledger_name}}</strong>
+        <br>
+        {{report_type_label}}
+        <br>
+        {{from_date}} to {{as_of_date}}
+        <br>
+        <strong>{{type_of_bills_label}}</strong>
+    </p>
+    <table data-pdfmake='{"widths":{{table_widths}},"headerRows":1,"layout":"ledgerStatement"}'>
+        <thead>
+            <tr>
+                <th data-pdfmake='{"border":[false,true,false,true],"fillColor":"#ffffff"}'>Date</th>
+                <th data-pdfmake='{"border":[false,true,false,true],"fillColor":"#ffffff"}'>Ref. No.</th>
+                {{#if show_opening_amount}}
+                <th style="text-align: right;" data-pdfmake='{"border":[false,true,false,true],"fillColor":"#ffffff"}'>
+                    Opening<br>Amount</th>
+                {{/if}}
+                {{#if show_pending_amount}}
+                <th style="text-align: right;" data-pdfmake='{"border":[false,true,false,true],"fillColor":"#ffffff"}'>
+                    Pending<br>Amount</th>
+                {{/if}}
+                {{#if show_due_date}}
+                <th style="text-align: right;" data-pdfmake='{"border":[false,true,false,true],"fillColor":"#ffffff"}'>
+                    Due on</th>
+                {{/if}}
+                {{#if show_overdue_days}}
+                <th style="text-align: right;"
+                    data-pdfmake='{"border":[false,true,false,true],"fillColor":"#ffffff","italics":true}'>
+                    Overdue<br>by days</th>
+                {{/if}}
+            </tr>
+        </thead>
+        <tbody>
+            {{#each bills}}<tr>
+                <td>{{date}}</td>
+                <td>
+                    {{reference}}
+                    {{#if is_advance}} <em>(advance)</em>{{/if}}
+                    <small>
+                        {{#if ../show_order_number}}
+                        <br>
+                        {{order_number}}
+                        {{/if}}
+                        {{#if ../show_narrations}}
+                        <br>
+                        {{narration}}
+                        {{/if}}
+                    </small>
+                </td>
+                {{#if ../show_opening_amount}}
+                <td style="text-align:right">{{opening_amount}}</td>
+                {{/if}}
+                {{#if ../show_pending_amount}}
+                <td style="text-align:right"><strong>{{pending_amount}}</strong></td>
+                {{/if}}
+                {{#if ../show_due_date}}
+                <td style="text-align: right;">{{due_date}}</td>
+                {{/if}}
+                {{#if ../show_overdue_days}}
+                <td style="text-align:right">{{overdue_days}}</td>
+                {{/if}}
+            </tr>
+            {{/each}}
+            <tr>
+                <td colspan="2"></td>
+                {{#if show_opening_amount}}
+                <td style="text-align:right; border-top:1px solid #000;border-bottom:1px solid #000;">
+                    <strong>{{total_opening}}</strong>
+                </td>
+                {{/if}}
+                {{#if show_pending_amount}}
+                <td style="text-align:right; border-top:1px solid #000;border-bottom:1px solid #000;">
+                    <strong>{{total}}</strong>
+                </td>
+                {{/if}}
+                {{#if show_due_date}}
+                <td></td>
+                {{/if}}
+                {{#if show_overdue_days}}
+                <td></td>
+                {{/if}}
+            </tr>
+        </tbody>
+    </table>
+</body>
+
+</html>
