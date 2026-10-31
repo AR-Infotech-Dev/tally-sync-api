@@ -232,7 +232,7 @@ POST /api/v1/ledgers/statement/pdf (or /api/v1/ledgers/statement?format=pdf) acc
 - "no": Tally-style condensed ledger rows with Date, Particulars, Vch Type, Vch No., Debit and Credit, opening/closing balances and balancing totals.
 - "yes": same movements and balances, plus cached stock item, quantity, rate, amount, ledger-specific bill type/reference/amount/direction, and available narration.
 
-The PDF is rendered by our Handlebars/pdfmake templates; it is not Tally's native PDF file. Company address/email appear when present in the cache. Item and bill breakup never contributes a second time to the ledger totals. The JSON endpoint keeps the normalized statement and now includes cached inventory_entries, bill_allocations, company_details and details_available. is_detailed affects PDF presentation only.
+The PDF is rendered from Handlebars HTML/CSS using Puppeteer; it is not Tally's native PDF file. See PDF-RENDERING.md for local installation and Coolify Docker setup. Company address/email appear when present in the cache. Item and bill breakup never contributes a second time to the ledger totals. The JSON endpoint keeps the normalized statement and now includes cached inventory_entries, bill_allocations, company_details and details_available. is_detailed affects PDF presentation only.
 
 Update the Connector and complete the next sync once to backfill historical detail data. SQLite upgrades in place without deletion; the versioned manifest refreshes existing vouchers once. If details are not yet synced, a detailed PDF explicitly says so. No extra Tally export is performed per PDF request.
 

@@ -1,0 +1,259 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Item Movement Analysis</title>
+    <style>
+        /* Print styles for this report. Edit the layout here. */
+        html {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        body {
+            font-family: Report-latin, Report-devanagari, sans-serif;
+            font-size: 14px;
+            line-height: 1.3;
+            color: #111;
+            margin: 0;
+        }
+
+        h1 {
+            font-size: 20px;
+            margin: 0 0 3px;
+        }
+
+        h2 {
+            font-size: 16px;
+            margin: 0 0 8px;
+        }
+
+        p {
+            margin: 0 0 3px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            table-layout: auto;
+        }
+
+        thead {
+            display: table-header-group;
+        }
+
+        tfoot {
+            display: table-footer-group;
+        }
+
+        tr {
+            break-inside: avoid;
+        }
+
+        th,
+        td {
+            padding: 4px 5px;
+            vertical-align: top;
+            overflow-wrap: anywhere;
+        }
+
+        {{!-- th {
+            background: white;
+            border-top: 1px solid #444;
+            border-bottom: 1px solid #444;
+        } --}} th:first-child,
+        td:first-child {
+            text-align: left;
+        }
+
+        .number,
+        .amount {
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .border-top {
+            border-top: 1px solid #444;
+        }
+
+        .muted,
+        .narration,
+        .type,
+        .note {
+            color: #666;
+            font-size: 12px;
+        }
+
+        .stale {
+            color: #8d5900;
+            background: #fff5df;
+        }
+
+        .report-heading {
+            margin: 8px 0 12px;
+            text-align: center;
+        }
+
+        .indent {
+            padding-left: 20px;
+        }
+
+        .group-summary thead th {
+            border: 1px solid #444;
+        }
+
+        .border-top {
+            border-top: 1px solid #000
+        }
+
+        .border-top-none {
+            border-top: none;
+        }
+
+        .border-bottom-none {
+            border-bottom: none;
+        }
+
+        .border-left-none {
+            border-left: none;
+        }
+
+        .border-right-none {
+            border-right: none;
+        }
+
+        .border-bottom {
+            border-bottom: 1px solid #000
+        }
+
+        .border-left {
+            border-left: 1px solid #000;
+        }
+
+        .border-right {
+            border-right: 1px solid #000;
+        }
+
+    </style>
+</head>
+
+<body>
+    <h1 style="text-align:center">{{company}}</h1>
+    {{#each company_address}}
+    <p class="text-lg" style="text-align:center">{{this}}</p>
+    {{/each}}
+    {{#if company_phone}}
+    <p class="text-lg" style="text-align:center">Contact : {{company_phone}}</p>
+    {{/if}}
+    {{#if company_email}}
+    <p class="text-lg" style="text-align:center">E-Mail : {{company_email}}</p>
+    {{/if}}
+    <p class="report-heading">
+        <strong class="text-xl">{{stock_item}}</strong>
+        <br>
+        <span class="text-lg"> 
+            Item Movement Analysis
+        </span>
+        <br>
+        <span class="text-sm">
+            {{from_date}} to {{to_date}}
+        </span>
+    </p>
+    <table>
+        <thead>
+            <tr class="border-top">
+                <th>Particulars</th>
+                <th colspan="{{value_column_count}}"><strong>Movement Values</strong></th>
+            </tr>
+            <tr class="border-bottom">
+                <th style="width: 40%;"></th>
+                {{#if show_quantity}}
+                <th class="font-normal">Quantity</th>
+                {{/if}}
+
+                {{#if show_basic_rate_and_effective_rate}}
+                <th class="font-normal">Basic Rate</th>
+                <th class="font-normal">Effective Rate</th>
+                {{/if}}
+
+                {{#if show_value}}
+                <th class="font-normal">Value</th>
+                {{/if}}
+            </tr>
+        </thead>
+        <tbody>
+            {{#each sections}}
+            <tr>
+                <td colspan="{{@root.column_count}}"><strong>{{title}}</strong></td>
+            </tr>
+            {{#each groups}}
+            <tr>
+                <td colspan="{{@root.column_count}}"><em class="underline">{{title}}:</em></td>
+            </tr>
+            {{#each rows}}
+            <tr>
+                <td>{{party}}</td>
+                {{#if @root.show_quantity}}
+                <td style="text-align:right">{{quantity}}</td>
+                {{/if}}
+
+                {{#if
+                @root.show_basic_rate_and_effective_rate}}
+                <td style="text-align:right">{{basic_rate}}</td>
+                <td style="text-align:right">{{effective_rate}}</td>
+                {{/if}}
+
+                {{#if @root.show_value}}
+                <td style="text-align:right">{{value}}</td>
+                {{/if}}
+            </tr>
+            {{/each}}
+            {{#each totals}}
+            <tr>
+                <td></td>
+                {{#if @root.show_quantity}}
+                <td style="text-align:right;border-top:1px solid #000;border-bottom:1px solid #000">{{quantity}}</td>
+                {{/if}}
+
+                {{#if @root.show_basic_rate_and_effective_rate}}
+                <td style="border-top:1px solid #000;border-bottom:1px solid #000"></td>
+                <td style="text-align:right;border-top:1px solid #000;border-bottom:1px solid #000">{{effective_rate}}
+                </td>
+                {{/if}}
+
+                {{#if @root.show_value}}
+                <td style="text-align:right;border-top:1px solid #000;border-bottom:1px solid #000">{{value}}</td>
+                {{/if}}
+            </tr>
+            {{/each}}
+            {{/each}}
+
+            {{#each totals}}
+            <tr>
+                <td></td>
+                {{#if @root.show_quantity}}
+                <td class="border-top border-bottom text-right"><strong>{{quantity}}</strong></td>
+                {{/if}}
+                {{#if @root.show_basic_rate_and_effective_rate}}
+                <td class="border-top border-bottom"></td>
+                <td class="border-top border-bottom text-right"><strong>{{effective_rate}}</strong></td>
+                {{/if}}
+                {{#if @root.show_value}}
+                <td class="border-top border-bottom text-right"><strong>{{value}}</strong></td>
+                {{/if}}
+            </tr>
+            {{/each}}
+
+            {{/each}}
+            {{#unless sections}}
+            <tr>
+                <td colspan="{{column_count}}">No movements match the selected configuration.</td>
+            </tr>
+            {{/unless}}
+        </tbody>
+    </table>
+</body>
+
+</html>

@@ -5,7 +5,7 @@ import { recordConsoleLog } from "../console/consoleLog.store.js";
 import { assertConnectorAvailable, assertConnectorConnected, assertNoAvailabilityFailure } from "../connectors/connectorAvailability.service.js";
 
 function notifyConnector(request) {
-  if (["ledger_statement", "group_summary", "outstanding"].includes(request.transaction_type)) return emitToConnector(request.client_id, SOCKET_EVENTS.ledgerStatementFetch, { request_id: request.request_id, transaction_type: request.transaction_type });
+  if (["ledger_statement", "group_summary", "outstanding", "stock_item_movement"].includes(request.transaction_type)) return emitToConnector(request.client_id, SOCKET_EVENTS.ledgerStatementFetch, { request_id: request.request_id, transaction_type: request.transaction_type });
   if (["sales_order_lookup", "sales_voucher_lookup"].includes(request.transaction_type)) return emitToConnector(request.client_id, SOCKET_EVENTS.salesOrderFetch, { request_id: request.request_id });
   const isSalesVoucher = request.transaction_type === "sales_voucher";
   const isReceiptVoucher = request.transaction_type === "receipt_voucher";

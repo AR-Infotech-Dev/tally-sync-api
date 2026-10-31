@@ -4,23 +4,127 @@
 <head>
     <meta charset="utf-8">
     <title>Outstanding Report</title>
+    <style>
+        /* Print styles for this report. Edit the layout here. */
+        html {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        body {
+            font-family: Report-latin, Report-devanagari, sans-serif;
+            font-size: 14px;
+            line-height: 1.3;
+            color: #111;
+            margin: 0;
+        }
+
+        h1 {
+            font-size: 20px;
+            margin: 0 0 3px;
+        }
+
+        h2 {
+            font-size: 16px;
+            margin: 0 0 8px;
+        }
+
+        p {
+            margin: 0 0 3px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            table-layout: auto;
+        }
+
+        thead {
+            display: table-header-group;
+        }
+
+        tfoot {
+            display: table-footer-group;
+        }
+
+        tr {
+            break-inside: avoid;
+        }
+
+        th,
+        td {
+            padding: 4px 5px;
+            vertical-align: top;
+            overflow-wrap: anywhere;
+        }
+
+        /* 
+th {
+    background: white;
+    border-top: 1px solid #444;
+    border-bottom: 1px solid #444;
+} */
+
+        th:first-child,
+        td:first-child {
+            text-align: left;
+        }
+
+        .number,
+        .amount {
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .border-top {
+            border-top: 1px solid #444;
+        }
+
+        .muted,
+        .narration,
+        .type,
+        .note {
+            color: #666;
+            font-size: 12px;
+        }
+
+        .stale {
+            color: #8d5900;
+            background: #fff5df;
+        }
+
+        .report-heading {
+            margin: 8px 0 12px;
+            text-align: center;
+        }
+
+        .indent {
+            padding-left: 20px;
+        }
+
+        .group-summary thead th {
+            border: 1px solid #444;
+        }
+
+    </style>
 </head>
 
 <body>
     {{#if show_company_name}}
-    <h1 style="text-align:center; font-size: 20px" data-pdfmake='{"margin":[0,0,0,3]}'>{{company}}</h1>
+    <h1 class="text-center font-xl">{{company}}</h1>
     {{/if}}
     {{#if company_address}}
-    <p style="text-align:center;margin:0">{{company_address}}</p>
+    <p class="text-center font-lg">{{company_address}}</p>
     {{/if}}
     {{#if company_phone}}
-    <p style="text-align:center;margin:0">Contact : {{company_phone}}</p>
+    <p class="text-center font-lg">Contact : {{company_phone}}</p>
     {{/if}}
     {{#if company_email}}
-    <p style="text-align:center;margin:0">E-Mail : {{company_email}}</p>
+    <p class="text-center font-lg">E-Mail : {{company_email}}</p>
     {{/if}}
-    <p style="text-align:center" data-pdfmake='{"margin":[0,4,0,8]}'>
-        <strong>{{ledger_name}}</strong>
+    <p style="text-align:center">
+        <strong class="text-center font-lg">{{ledger_name}}</strong>
         <br>
         {{report_type_label}}
         <br>
@@ -28,36 +132,38 @@
         <br>
         <strong>{{type_of_bills_label}}</strong>
     </p>
-    <table data-pdfmake='{"widths":{{table_widths}},"headerRows":1,"layout":"ledgerStatement"}'>
+    <table>
         <thead>
-            <tr>
-                <th data-pdfmake='{"border":[false,true,false,true],"fillColor":"#ffffff"}'>Date</th>
-                <th data-pdfmake='{"border":[false,true,false,true],"fillColor":"#ffffff"}'>Ref. No.</th>
+            <tr class="border-top border-bottom">
+                <th>Date</th>
+                <th class="font-normal">Ref. No.</th>
                 {{#if show_opening_amount}}
-                <th style="text-align: right;" data-pdfmake='{"border":[false,true,false,true],"fillColor":"#ffffff"}'>
+                <th class="font-normal" style="text-align: right;">
                     Opening<br>Amount</th>
                 {{/if}}
                 {{#if show_pending_amount}}
-                <th style="text-align: right;" data-pdfmake='{"border":[false,true,false,true],"fillColor":"#ffffff"}'>
+                <th style="text-align: right;">
                     Pending<br>Amount</th>
                 {{/if}}
                 {{#if show_due_date}}
-                <th style="text-align: right;" data-pdfmake='{"border":[false,true,false,true],"fillColor":"#ffffff"}'>
+                <th class="font-normal" style="text-align: right;">
                     Due on</th>
                 {{/if}}
                 {{#if show_overdue_days}}
-                <th style="text-align: right;"
-                    data-pdfmake='{"border":[false,true,false,true],"fillColor":"#ffffff","italics":true}'>
+                <th class="font-normal italic" style="text-align: right;">
                     Overdue<br>by days</th>
                 {{/if}}
             </tr>
         </thead>
         <tbody>
-            {{#each bills}}<tr>
+            {{#each bills}}
+            <tr>
                 <td>{{date}}</td>
                 <td>
                     {{reference}}
-                    {{#if is_advance}} <em>(advance)</em>{{/if}}
+                    {{#if is_advance}}
+                    <em>(advance)</em>
+                    {{/if}}
                     <small>
                         {{#if ../show_order_number}}
                         <br>
@@ -79,7 +185,7 @@
                 <td style="text-align: right;">{{due_date}}</td>
                 {{/if}}
                 {{#if ../show_overdue_days}}
-                <td style="text-align:right">{{overdue_days}}</td>
+                <td class="italic" style="text-align:right">{{overdue_days}}</td>
                 {{/if}}
             </tr>
             {{/each}}
@@ -87,7 +193,7 @@
                 <td colspan="2"></td>
                 {{#if show_opening_amount}}
                 <td style="text-align:right; border-top:1px solid #000;border-bottom:1px solid #000;">
-                    <strong>{{total_opening}}</strong>
+                    {{total_opening}}
                 </td>
                 {{/if}}
                 {{#if show_pending_amount}}
