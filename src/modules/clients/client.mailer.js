@@ -1,27 +1,40 @@
-import nodemailer from "nodemailer";
-import { renderClientCredentialsEmail } from "./client-email.template.js";
+import nodemailer from 'nodemailer'
+import { renderClientCredentialsEmail } from './client-email.template.js'
+import { buildClientMailConfig } from './client-mail.config.js'
 
-export function buildClientCredentialsMessage(input, from) {
+export function buildClientCredentialsMessage (input, from) {
   return {
     from,
     to: input.email,
-    subject: "Your Tally Sync Connector credentials",
-    ...renderClientCredentialsEmail(input),
-  };
+    subject: 'Your Tally Sync Connector credentials',
+    ...renderClientCredentialsEmail(input)
+  }
 }
 
-export async function sendClientCredentialsEmail({ email, name, clientId, connectorId, apiKey, connectorKey, activationCode }) {
-  const { EMAIL_USER, EMAIL_PASS } = process.env;
-  if (!EMAIL_USER || !EMAIL_PASS) {
-    const error = new Error("Gmail is not configured. Set EMAIL_USER and EMAIL_PASS in the server environment.");
-    error.status = 503;
-    throw error;
-  }
+export async function sendClientCredentialsEmail ({
+  email,
+  name,
+  clientId,
+  connectorId,
+  apiKey,
+  connectorKey,
+  activationCode
+}, { environment = process.env, createTransport = nodemailer.createTransport } = {}) {
+  const { transport, from } = buildClientMailConfig(environment)
+  const transporter = createTransport(transport)
 
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: { user: EMAIL_USER, pass: EMAIL_PASS },
-  });
-
-  await transporter.sendMail(buildClientCredentialsMessage({ email, name, clientId, connectorId, apiKey, connectorKey, activationCode }, EMAIL_USER));
+  await transporter.sendMail(
+    buildClientCredentialsMessage(
+      {
+        email,
+        name,
+        clientId,
+        connectorId,
+        apiKey,
+        connectorKey,
+        activationCode
+      },
+      from
+    )
+  )
 }
