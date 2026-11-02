@@ -1,42 +1,20 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { connectorJobSignal, getConnectorJobType } from "../connector-jobs/connector-job.registry.js";
+import { matchesCredentialHash } from "../../shared/utils/credentialHash.js";
 import { SOCKET_EVENTS } from "../../socket/utils/events.js";
 import { connectorRoom } from "../../socket/utils/rooms.js";
-import { findQueuedSalesOrders, markSalesOrderProcessing, updateSalesOrderRequest } from "../sales-order/sales.model.js";
+import { findQueuedConnectorJobs, markConnectorJobProcessing, updateConnectorJob } from "../connector-jobs/connector-job.model.js";
 import { findActiveClient } from "../clients/client.model.js";
 import { recordConsoleLog } from "../console/consoleLog.store.js";
 import { dispatchPendingSalesVoucherPdfs } from "../sales/sales-pdf.service.js";
 
-async function emitPendingSalesOrders(clientId, socket) {
-  const requests = await findQueuedSalesOrders(clientId);
+async function emitPendingConnectorJobs(clientId, socket) {
+  const requests = await findQueuedConnectorJobs(clientId);
   for (const request of requests) {
-    if (["ledger_statement", "group_summary", "outstanding", "stock_item_movement"].includes(request.transaction_type)) {
-      socket.emit(SOCKET_EVENTS.ledgerStatementFetch, { request_id: request.request_id, transaction_type: request.transaction_type });
-      continue;
-    }
-    if (["sales_order_lookup", "sales_voucher_lookup"].includes(request.transaction_type)) {
-      socket.emit(SOCKET_EVENTS.salesOrderFetch, { request_id: request.request_id });
-      continue;
-    }
-    const isSalesVoucher = request.transaction_type === "sales_voucher";
-    const isReceiptVoucher = request.transaction_type === "receipt_voucher";
-    const isPurchaseOrder = request.transaction_type === "purchase_order";
-    const isPurchaseVoucher = request.transaction_type === "purchase_voucher";
-    const isPaymentVoucher = request.transaction_type === "payment_voucher";
-    const event = isReceiptVoucher
-      ? SOCKET_EVENTS.receiptVoucherPush
-      : isSalesVoucher ? SOCKET_EVENTS.salesVoucherPush
-        : isPurchaseOrder ? SOCKET_EVENTS.purchaseOrderPush
-          : isPurchaseVoucher ? SOCKET_EVENTS.purchaseVoucherPush
-            : isPaymentVoucher ? SOCKET_EVENTS.paymentVoucherPush : SOCKET_EVENTS.salesOrderPush;
-    socket.emit(event, {
-      request_id: request.request_id,
-      action: isReceiptVoucher ? "receipt.push" : isSalesVoucher ? "sales.push"
-        : isPurchaseOrder ? "purchase_order.push" : isPurchaseVoucher ? "purchase.push"
-          : isPaymentVoucher ? "payment.push" : "sales_order.push",
-    });
+    const signal = connectorJobSignal(request);
+    socket.emit(signal.event, signal.payload);
   }
   if (requests.length) {
-    console.info("Queued sales orders sent to connector:", { clientId, count: requests.length });
+    console.info("Queued jobs sent to connector:", { clientId, count: requests.length });
     recordConsoleLog("info", "Queued sales order signals dispatched", { source: "socket", clientId, count: requests.length });
   }
 }
@@ -80,9 +58,7 @@ export function registerConnectorSocketHandlers(socket) {
       ack({ success: false, code: "CONNECTOR_UNAUTHORIZED", message: "Invalid connector credentials." });
       return;
     }
-    const receivedHash = createHash("sha256").update(payload.connector_key).digest();
-    const expectedHash = Buffer.from(connectorKeyHash, "hex");
-    if (!timingSafeEqual(receivedHash, expectedHash)) {
+    if (!matchesCredentialHash(payload.connector_key, connectorKeyHash)) {
       recordConsoleLog("warn", "Connector registration rejected: key did not match", { source: "socket", clientId, connectorId, socketId: socket.id });
       ack({ success: false, code: "CONNECTOR_UNAUTHORIZED", message: "Invalid connector credentials." });
       return;
@@ -110,7 +86,7 @@ export function registerConnectorSocketHandlers(socket) {
       message: "Test signal from Tally Sync Server.",
       at: new Date().toISOString(),
     });
-    emitPendingSalesOrders(clientId, socket)
+    emitPendingConnectorJobs(clientId, socket)
       .catch((error) => {
         console.error("Could not dispatch queued sales orders:", error.message);
         recordConsoleLog("error", "Could not dispatch queued sales orders", { source: "socket", clientId, connectorId });
@@ -137,7 +113,7 @@ export function registerConnectorSocketHandlers(socket) {
     socket.emit(SOCKET_EVENTS.connectorHeartbeatAck, result);
     // Recover queued work if a one-time push signal was missed while this
     // authenticated socket stayed connected.
-    emitPendingSalesOrders(socket.data.clientId, socket)
+    emitPendingConnectorJobs(socket.data.clientId, socket)
       .catch((error) => {
         console.error("Could not reconcile queued sales orders:", error.message);
         recordConsoleLog("error", "Could not reconcile queued sales orders", {
@@ -171,7 +147,7 @@ export function registerConnectorSocketHandlers(socket) {
   socket.on(SOCKET_EVENTS.connectorAck, (payload = {}) => {
     if (!socket.data.clientId) return;
     if ([SOCKET_EVENTS.salesOrderPush, SOCKET_EVENTS.salesVoucherPush, SOCKET_EVENTS.receiptVoucherPush, SOCKET_EVENTS.purchaseOrderPush, SOCKET_EVENTS.purchaseVoucherPush, SOCKET_EVENTS.paymentVoucherPush].includes(payload.event) && typeof payload.request_id === "string") {
-      markSalesOrderProcessing(socket.data.clientId, payload.request_id)
+      markConnectorJobProcessing(socket.data.clientId, payload.request_id)
         .catch((error) => console.error("Could not mark transaction as processing:", error.message));
     }
     console.info("Connector event ACK:", {
@@ -194,17 +170,12 @@ export function registerConnectorSocketHandlers(socket) {
     const allowedStatuses = new Set(["fetching", "building_xml", "pushing", "succeeded", "failed"]);
     if (!allowedStatuses.has(payload.status)) return;
     try {
-      await updateSalesOrderRequest(socket.data.clientId, payload.request_id, {
+      await updateConnectorJob(socket.data.clientId, payload.request_id, {
         status: payload.status,
         error: payload.error,
         tally_result: payload.tally_result,
       });
-      const transactionLabel = payload.transaction_type === "receipt_voucher"
-        ? "Receipt Voucher"
-        : payload.transaction_type === "sales_voucher" ? "Sales Voucher"
-          : payload.transaction_type === "purchase_order" ? "Purchase Order"
-            : payload.transaction_type === "purchase_voucher" ? "Purchase Voucher"
-              : payload.transaction_type === "payment_voucher" ? "Payment Voucher" : "Sales Order";
+      const transactionLabel = getConnectorJobType(payload.transaction_type).label;
       console.info(`${transactionLabel} job update:`, { clientId: socket.data.clientId, requestId: payload.request_id, status: payload.status });
       recordConsoleLog(payload.status === "failed" ? "error" : payload.status === "succeeded" ? "success" : "info", `${transactionLabel} ${payload.status}`, { source: "job", clientId: socket.data.clientId, requestId: payload.request_id });
     } catch (error) {

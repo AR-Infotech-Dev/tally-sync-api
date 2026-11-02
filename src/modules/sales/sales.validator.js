@@ -1,47 +1,8 @@
+import { isVoucherDate } from "../../shared/utils/dateValidation.js";
 import { validateItemIdentity } from "../../shared/utils/itemIdentity.js";
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
-export function validateSalesPdfLookup(query = {}) {
-  const lookup = {
-    company: query.company,
-    ledgerName: query.ledger_name ?? query.party_ledger,
-    voucherNumber: query.voucher_no ?? query.voucher_number,
-    voucherDate: query.voucher_date,
-  };
-  const errors = [];
-  for (const [field, value] of Object.entries(lookup)) {
-    if (field === "voucherDate" && value === undefined) continue;
-    if (typeof value !== "string" || !value.trim() || value.length > 500 || /[\x00-\x1f]/.test(value)) {
-      errors.push({ field, message: `${field} must be a non-empty string up to 500 characters.` });
-    } else lookup[field] = value.trim();
-  }
-  if (lookup.voucherDate !== undefined && (!/^\d{4}-\d{2}-\d{2}$/.test(lookup.voucherDate) || !isRealDate(lookup.voucherDate))) {
-    errors.push({ field: "voucher_date", message: "voucher_date must be a real YYYY-MM-DD date." });
-  }
-  return { lookup, errors };
-}
 
-function isRealDate(value) {
-  if (typeof value !== "string") return false;
-  const input = value.trim();
-  let year;
-  let month;
-  let day;
-  let match;
-  if ((match = input.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/)) || (match = input.match(/^(\d{4})(\d{2})(\d{2})$/))) {
-    [, year, month, day] = match;
-  } else if ((match = input.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2}|\d{4})$/))) {
-    [, day, month, year] = match;
-    if (year.length === 2) year = `20${year}`;
-  } else {
-    return false;
-  }
-
-  const parsed = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
-  return parsed.getUTCFullYear() === Number(year)
-    && parsed.getUTCMonth() === Number(month) - 1
-    && parsed.getUTCDate() === Number(day);
-}
 
 function getPartyLedger(sales) {
   return sales.party?.dealer_code
@@ -69,7 +30,7 @@ export function validateSalesVoucherRequest(input = {}) {
   }
 
   const date = sales.date || sales.voucher_date;
-  if (!isRealDate(date)) {
+  if (!isVoucherDate(date)) {
     errors.push({ field: "sales.date", message: "A valid voucher date is required. Use YYYY-MM-DD, YYYYMMDD, or DD-MM-YYYY." });
   }
   if (!getPartyLedger(sales)) {

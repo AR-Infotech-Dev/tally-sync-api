@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { matchesCredentialHash } from "../shared/utils/credentialHash.js";
 import { asyncHandler } from "../shared/utils/asyncHandler.js";
 import { failureResponse } from "../shared/utils/apiResponse.js";
 import { findActiveClient } from "../modules/clients/client.model.js";
@@ -17,13 +17,7 @@ export const requireClientApiKey = asyncHandler(async (req, res, next) => {
 
   const client = await findActiveClient(clientId);
   const storedHash = client?.api_key_hash;
-  if (!storedHash || !/^[a-f0-9]{64}$/i.test(storedHash)) {
-    return failureResponse(res, { code: 2005, httpStatus: 401, message: "Invalid client credentials." });
-  }
-
-  const receivedHash = createHash("sha256").update(apiKey).digest();
-  const expectedHash = Buffer.from(storedHash, "hex");
-  if (!timingSafeEqual(receivedHash, expectedHash)) {
+  if (!matchesCredentialHash(apiKey, storedHash)) {
     return failureResponse(res, { code: 2005, httpStatus: 401, message: "Invalid client credentials." });
   }
 

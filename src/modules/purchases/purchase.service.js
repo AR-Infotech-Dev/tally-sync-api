@@ -1,4 +1,4 @@
-import { queueSalesOrder, readSalesOrder } from "../sales-order/sales.service.js";
+import { queueConnectorJob, readConnectorJob } from "../connector-jobs/connector-job.service.js";
 
 const settings = {
   purchase_order: { field: "purchase_order", keyPrefix: "purchase-order", defaultVoucherType: "Purchase Order" },
@@ -36,7 +36,7 @@ function normalizeVoucher(data, kind) {
 export function queuePurchaseTransaction(input, kind) {
   const config = settings[kind];
   if (!config) throw new TypeError(`Unsupported purchase transaction type '${kind}'.`);
-  return queueSalesOrder({
+  return queueConnectorJob({
     client_id: input.client_id,
     destination: input.destination,
     idempotency_key: input.idempotency_key ? `${config.keyPrefix}:${input.idempotency_key}` : undefined,
@@ -45,4 +45,4 @@ export function queuePurchaseTransaction(input, kind) {
   });
 }
 
-export const readPurchaseTransaction = (clientId, requestId) => readSalesOrder(clientId, requestId);
+export const readPurchaseTransaction = (clientId, requestId) => readConnectorJob(clientId, requestId);

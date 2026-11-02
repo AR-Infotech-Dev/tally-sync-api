@@ -1,4 +1,4 @@
-import { queueSalesOrder, readSalesOrder } from "../sales-order/sales.service.js";
+import { queueConnectorJob, readConnectorJob } from "../connector-jobs/connector-job.service.js";
 
 function normalizeReceipt(receipt) {
   const amount = Math.abs(Number(receipt.amount));
@@ -19,7 +19,7 @@ function normalizeReceipt(receipt) {
 }
 
 export function queueReceiptVoucher(input) {
-  return queueSalesOrder({
+  return queueConnectorJob({
     client_id: input.client_id,
     destination: input.destination,
     idempotency_key: input.idempotency_key ? `receipt-voucher:${input.idempotency_key}` : undefined,
@@ -29,5 +29,5 @@ export function queueReceiptVoucher(input) {
 }
 
 export function readReceiptVoucher(clientId, requestId) {
-  return readSalesOrder(clientId, requestId);
+  return readConnectorJob(clientId, requestId);
 }

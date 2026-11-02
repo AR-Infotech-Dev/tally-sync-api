@@ -1,6 +1,6 @@
 import express from "express";
 import ledgerRouter from "../modules/ledgers/ledger.router.js";
-import salesOrderRouter from "../modules/sales-order/sales.router.js";
+import salesOrderRouter from "../modules/sales-order/sales-order.router.js";
 import salesRouter from "../modules/sales/sales.router.js";
 import receiptRouter from "../modules/receipts/receipt.router.js";
 import clientRouter from "../modules/clients/client.router.js";

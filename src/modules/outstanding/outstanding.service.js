@@ -1,3 +1,8 @@
-import { queueSalesOrder, waitForSalesOrderCompletion, readSalesOrder } from "../sales-order/sales.service.js";
-export async function requestOutstanding(clientId, input, shouldStop) { const result = await queueSalesOrder({ client_id: clientId, transaction_type: "outstanding", destination: { company_id: input.company_id }, lookup: { ...input, company_id: input.company_id } }); const timeoutMs = Math.max(1000, Number(process.env.LEDGER_RESPONSE_TIMEOUT_MS) || 15000); return { ...await waitForSalesOrderCompletion(clientId, result.request.request_id, { shouldStop, timeoutMs }), requestId: result.request.request_id }; }
-export async function readOutstanding(clientId, requestId) { const request = await readSalesOrder(clientId, requestId); return request?.transaction_type === "outstanding" ? request : null; }
+import { requestConnectorReport, readConnectorReport } from "../connector-jobs/connector-job.service.js";
+
+export function requestOutstanding(clientId, input, shouldStop) {
+  const lookup = { ...input, company_id: input.company_id };
+  return requestConnectorReport(clientId, lookup, "outstanding", shouldStop);
+}
+
+export const readOutstanding = (clientId, requestId) => readConnectorReport(clientId, requestId, "outstanding");

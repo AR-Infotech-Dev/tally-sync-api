@@ -1,10 +1,9 @@
 import { requireConnectedConnector } from "../../middlewares/connectedConnector.middleware.js";
 import express from "express";
-import { getSalesVoucherFromTally } from "../sales-order/sales.controller.js";
 import { getSalesPdfConnectorJob } from "./sales.controller.js";
 import { requireClientApiKey } from "../../middlewares/clientApiKey.middleware.js";
 import { requireConnectorKey } from "../../middlewares/connectorApiKey.middleware.js";
-import { getSalesVoucherRequest, pushSalesVoucher, requestSalesVoucherPdfDownload, requestSalesVoucherPdfDownloadByNumber, updateSalesVoucherPdfStatus, uploadSalesVoucherPdf } from "./sales.controller.js";
+import { getSalesVoucherFromTally, getSalesVoucherRequest, pushSalesVoucher, requestSalesVoucherPdfDownload, requestSalesVoucherPdfDownloadByNumber, updateSalesVoucherPdfStatus, uploadSalesVoucherPdf } from "./sales.controller.js";
 
 const router = express.Router();
 router.post("/push", requireClientApiKey, requireConnectedConnector, pushSalesVoucher);

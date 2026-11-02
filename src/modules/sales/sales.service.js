@@ -1,4 +1,4 @@
-import { queueSalesOrder, readSalesOrder } from "../sales-order/sales.service.js";
+import { queueConnectorJob, readConnectorJob } from "../connector-jobs/connector-job.service.js";
 
 function normalizeSalesVoucher(sales) {
   const items = sales.items || sales.line_items || sales.lineItems || [];
@@ -34,7 +34,7 @@ function normalizeSalesVoucher(sales) {
 }
 
 export async function queueSalesVoucher(input) {
-  return queueSalesOrder({
+  return queueConnectorJob({
     client_id: input.client_id,
     destination: input.destination,
     idempotency_key: input.idempotency_key ? `sales-voucher:${input.idempotency_key}` : undefined,
@@ -46,5 +46,5 @@ export async function queueSalesVoucher(input) {
 }
 
 export function readSalesVoucher(clientId, requestId) {
-  return readSalesOrder(clientId, requestId);
+  return readConnectorJob(clientId, requestId);
 }

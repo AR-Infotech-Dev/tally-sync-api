@@ -1,24 +1,6 @@
+import { isVoucherDate } from "../../shared/utils/dateValidation.js";
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
-function isValidDate(value) {
-  if (typeof value !== "string") return false;
-  const input = value.trim();
-  let year;
-  let month;
-  let day;
-  let match;
-  if ((match = input.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/)) || (match = input.match(/^(\d{4})(\d{2})(\d{2})$/))) {
-    [, year, month, day] = match;
-  } else if ((match = input.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2}|\d{4})$/))) {
-    [, day, month, year] = match;
-    if (year.length === 2) year = `20${year}`;
-  } else return false;
-
-  const parsed = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
-  return parsed.getUTCFullYear() === Number(year)
-    && parsed.getUTCMonth() === Number(month) - 1
-    && parsed.getUTCDate() === Number(day);
-}
 
 export function validateReceiptVoucherRequest(input = {}) {
   const body = isObject(input) ? input : {};
@@ -34,7 +16,7 @@ export function validateReceiptVoucherRequest(input = {}) {
   }
 
   const date = receipt.date || receipt.voucher_date;
-  if (!isValidDate(date)) {
+  if (!isVoucherDate(date)) {
     errors.push({ field: "receipt.date", message: "A valid voucher date is required. Use YYYY-MM-DD, YYYYMMDD, or DD-MM-YYYY." });
   }
   if (!(receipt.party?.dealer_code || receipt.dealer_code || receipt.party?.ledger_name || receipt.party_ledger)) {

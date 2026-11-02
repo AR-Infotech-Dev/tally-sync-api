@@ -2,28 +2,6 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const isProduction = process.env.NODE_ENV === "production";
-// const requiredProductionEnv = [
-//   "APP_URL",
-//   "APP_FE_URL",
-//   "SESSION_SECRET",
-//   "JWT_SECRET",
-//   "DB_HOST",
-//   "DB_USER",
-//   "DB_PASSWORD",
-//   "DB_NAME",
-//   // "EMAIL_USER",
-//   // "EMAIL_PASS",
-// ];
-
-// if (isProduction) {
-//   const missingEnv = requiredProductionEnv.filter((key) => !process.env[key]);
-
-//   if (missingEnv.length > 0) {
-//     throw new Error(`Missing required production environment variables: ${missingEnv.join(", ")}`);
-//   }
-// }
-
 export const env = {
   nodeEnv: process.env.NODE_ENV || "development",
   port: Number(process.env.PORT || 3000),

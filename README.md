@@ -6,7 +6,7 @@
 
 Use `POST /api/v1/ledgers/statement/pdf` with the same JSON body and `X-Client-ID` / `X-API-Key` headers as the statement API. Alternatively, request `POST /api/v1/ledgers/statement?format=pdf`. Both use the same authenticated local-cache job; no additional Tally export is performed. A successful response is PDF bytes (`Content-Type: application/pdf`, attachment disposition, no-store); failures keep the normal JSON error response. The original statement endpoint still returns JSON by default. In Postman use PDF Preview or Save Response to File. Frontends should request a Blob, then display its object URL in a PDF viewer.
 
-The Server fills `src/templates/ledger-statement.hbs` with Handlebars, converts the rendered HTML using `html-to-pdfmake` and `jsdom`, and generates a PDF Buffer using `pdfmake`. No Chrome, browser download, system fonts or Linux graphics packages are needed. Layout uses supported inline HTML styles and table `data-pdfmake` options; class styles, A4 margins and embedded Noto Latin/Devanagari fonts are configured in `ledger-pdf.service.js`. `ledger-pdf.utils.js` formats the statement data and `ledger-pdf-fonts.utils.js` selects font subsets. The footer remains in `src/templates/pdf-footer.hbs` with `page_number` and `page_count` placeholders. Table headings repeat, entries can span pages, and files are generated in memory. Scripts do not execute, remote resources are blocked, local access is limited to bundled fonts, and all statement values are escaped by Handlebars. Existing PDF API routes and download headers are unchanged.
+The Server fills `src/templates/ledger-statement.hbs` with Handlebars and renders HTML/CSS with Puppeteer/Chromium. `src/shared/utils/htmlPdf.js` controls A4 pages, margins, embedded Noto Latin/Devanagari fonts, page numbering and browser reuse with at most two simultaneous PDF pages. Shared utility classes live in `src/templates/pdf.css`; each report keeps its own editable styles in its HBS template. `ledger-pdf.utils.js` prepares the report data. PDFs are generated in memory, JavaScript is disabled, and network/file resource requests are blocked; bundled fonts and CSS are embedded. Existing PDF API routes and download headers are unchanged.
 
 Ledger statement requests now read the Connector local SQLite snapshot. The Connector syncs all ledger masters and voucher allocations on connection, then checks for changes every 180 seconds. If a company is configured, that company is synced; otherwise all open companies are synced sequentially. No statement request makes a Tally HTTP call.
 
@@ -199,7 +199,17 @@ Verification: `node --test test/*.test.js` in Server and Connector. The onboardi
 
 ## PDF deployment
 
-Run `npm ci` and deploy the updated Server. The Dockerfile uses Node 22 and JavaScript dependencies only. Previous browser installer services, scripts, package hooks and browser environment options have been removed. The HTML template has been adapted for pdfmake-supported formatting; arbitrary browser CSS (flex/grid/stylesheets) is not supported.
+Run `npm ci` and deploy the updated Server. The Dockerfile uses Node 22 and installs Chromium and fonts for Coolify. It sets `PUPPETEER_SKIP_DOWNLOAD=true`, `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium` and `PDF_BROWSER_NO_SANDBOX=true` for that container. On a local development machine, Puppeteer uses its installed browser unless `PUPPETEER_EXECUTABLE_PATH` specifies another executable. PDF templates use normal HTML/CSS, including utility classes from `pdf.css`; legacy `data-pdfmake` attributes are not used.
+
+## Server architecture and checks
+
+- Routes contain routing and authentication middleware. Module controllers configure reusable handlers in `src/shared/http`; module validators and services retain their own business rules and normalization.
+- `src/modules/connector-jobs` owns the generic request model, queue/wait flow and transaction registry. Both initial delivery and reconnect delivery use the same registry. Socket event names and Connector payloads are preserved.
+- The MongoDB collection remains `sales_order_requests`, including existing document fields, client scoping, idempotency index and terminal-job TTL. No data migration is required. The internal Sales Order files use the `sales-order.*` prefix.
+- Shared date helpers preserve the existing date policy of each endpoint. Credential comparison is centralized in `credentialHash.js` and uses timing-safe hash comparison.
+- Unexpected errors now also include the standard `success/code/type/message` envelope while retaining legacy `flag/statusCode/msg/data` aliases. Known API errors keep their original envelope. Outstanding validation includes field-level errors, missing report data returns a JSON error, and PDF downloads disable caching.
+- Unreferenced MySQL/session/JWT middleware, duplicate unused font helpers and the unused PDF footer were removed. Their unreferenced dependencies were removed from the lockfile. Existing environment configuration keys remain available.
+- Run `npm test` for validation, dispatch, authentication-hash and controller regression checks. These use injected job results and do not create vouchers in Tally or require MongoDB. Live MongoDB/Connector/Tally integration still requires a configured environment.
 
 ## Order allocation due dates
 

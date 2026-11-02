@@ -1,20 +1,9 @@
-import {validateOrderDueDates} from '../../shared/utils/orderDueDate.js';
+import { isVoucherDate } from "../../shared/utils/dateValidation.js";
+import { validateOrderDueDates } from "../../shared/utils/orderDueDate.js";
 import { validateItemIdentity } from "../../shared/utils/itemIdentity.js";
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+const validDate = (value) => isVoucherDate(value, { flexibleYearFirst: false });
 
-function validDate(value) {
-  if (typeof value !== "string") return false;
-  const text = value.trim();
-  let match = text.match(/^(\d{4})[-/.]?(\d{2})[-/.]?(\d{2})$/);
-  let year; let month; let day;
-  if (match) [, year, month, day] = match;
-  else if ((match = text.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2}|\d{4})$/))) {
-    [, day, month, year] = match;
-    if (year.length === 2) year = `20${year}`;
-  } else return false;
-  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
-  return date.getUTCFullYear() === Number(year) && date.getUTCMonth() === Number(month) - 1 && date.getUTCDate() === Number(day);
-}
 
 export function validatePurchaseRequest(body = {}, kind) {
   const config = {

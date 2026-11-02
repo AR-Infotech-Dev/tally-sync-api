@@ -1,8 +1,6 @@
-import { queueSalesOrder, waitForSalesOrderCompletion } from "../sales-order/sales.service.js";
+import { requestConnectorReport } from "../connector-jobs/connector-job.service.js";
 
-export async function requestMovementAnalysis(clientId, input, shouldStop) {
+export function requestMovementAnalysis(clientId, input, shouldStop) {
   const lookup = { company_id: input.company_id.trim(), ...(input.item_code !== undefined ? { item_code: input.item_code.trim() } : {}), ...(typeof input.stock_item === "string" ? { stock_item: input.stock_item.trim() } : {}), from_date: input.from_date, to_date: input.to_date, movement_type: input.movement_type || "all" };
-  const result = await queueSalesOrder({ client_id: clientId, transaction_type: "stock_item_movement", destination: { company_id: lookup.company_id }, lookup });
-  const timeoutMs = Math.max(1000, Number(process.env.MOVEMENT_RESPONSE_TIMEOUT_MS) || 60000);
-  return { ...await waitForSalesOrderCompletion(clientId, result.request.request_id, { shouldStop, timeoutMs }), requestId: result.request.request_id };
+  return requestConnectorReport(clientId, lookup, "stock_item_movement", shouldStop, { timeoutEnv: "MOVEMENT_RESPONSE_TIMEOUT_MS", timeoutDefault: 60000 });
 }

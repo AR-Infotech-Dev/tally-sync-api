@@ -6,6 +6,5 @@ export function groupSummaryPdfFilename(summary) { const group = String(summary.
 export async function generateGroupSummaryPdf(summary) {
   const template = await readFile(new URL("../../templates/group-summary.hbs", import.meta.url), "utf8");
   const data = buildGroupSummaryPdfData(summary, summary.pdf_options || {});
-  console.log(data);
   return renderHtmlPdf(Handlebars.compile(template)(data), { landscape: false, showPageNumber: data.show_page_number });
 }

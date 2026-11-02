@@ -1,73 +1,19 @@
+import { createVoucherLookupHandler } from "../../shared/http/voucherLookupHandler.js";
+import { validateVoucherLookup } from "../../shared/utils/voucherLookup.validator.js";
+import { createVoucherHandlers } from "../../shared/http/voucherHandlers.js";
 import { asyncHandler } from "../../shared/utils/asyncHandler.js";
 import { failureResponse, successResponse } from "../../shared/utils/apiResponse.js";
 import { queueSalesVoucher, readSalesVoucher } from "./sales.service.js";
-import { waitForSalesOrderCompletion } from "../sales-order/sales.service.js";
-import { validateSalesVoucherRequest, validateSalesPdfLookup } from "./sales.validator.js";
+import { validateSalesVoucherRequest } from "./sales.validator.js";
 import { completeSalesPdf, failSalesPdf, markSalesPdfGenerating, readSalesPdf } from "./sales-pdf.model.js";
 import { requestSalesVoucherPdf, requestSalesVoucherPdfByNumber } from "./sales-pdf.service.js";
 import { assertNoAvailabilityFailure } from "../connectors/connectorAvailability.service.js";
 
-export const pushSalesVoucher = asyncHandler(async (req, res) => {
-  const errors = validateSalesVoucherRequest(req.body);
-  if (errors.length) {
-    return failureResponse(res, {
-      code: 2001,
-      httpStatus: 400,
-      message: "Invalid Sales Voucher request.",
-      data: { errors },
-    });
-  }
+export const getSalesVoucherFromTally = createVoucherLookupHandler("sales_voucher_lookup", "Sales Voucher");
 
-  const result = await queueSalesVoucher({ ...req.body, client_id: req.client.client_id });
-  const completion = await waitForSalesOrderCompletion(req.client.client_id, result.request.request_id, {
-    shouldStop: () => res.destroyed,
-  });
-  if (completion.disconnected) return;
-  if (!completion.request) return failureResponse(res, { code: 2004, httpStatus: 404, message: "Sales Voucher request was not found while waiting for the Connector." });
-  if (completion.timedOut) {
-    return failureResponse(res, {
-      code: 2011,
-      httpStatus: 504,
-      message: "The Connector has not returned a Tally result before the response timeout. The request remains queued or processing.",
-      data: { request_id: completion.request.request_id, status: completion.request.status },
-    });
-  }
-  if (completion.request.status === "failed") {
-    const lookupStatus = completion.request.tally_result?.lookup_status || 502;
-    return failureResponse(res, {
-      code: 2012,
-      httpStatus: lookupStatus,
-      message: lookupStatus === 404 || lookupStatus === 409 ? completion.request.error || "Company validation failed." : "Tally did not accept the Sales Voucher.",
-      data: { request_id: completion.request.request_id, status: completion.request.status, error: completion.request.error },
-    });
-  }
-
-  const tallyResult = completion.request.tally_result || null;
-  const submittedVoucherNumber = completion.request.sales_order?.voucher_number || completion.request.sales_order?.order_number || null;
-  const voucherNumber = tallyResult?.voucher_number_source === "tally" ? tallyResult.voucher_number : null;
-  return successResponse(res, {
-    code: 1000,
-    httpStatus: 200,
-    message: "Tally accepted the Sales Voucher.",
-    data: {
-      request_id: completion.request.request_id,
-      status: completion.request.status,
-      duplicate: result.duplicate,
-      transaction_type: completion.request.transaction_type,
-      voucher_number: voucherNumber,
-      submitted_voucher_number: tallyResult?.submitted_voucher_number || submittedVoucherNumber,
-      tally_result: tallyResult,
-    },
-  });
-});
-
-export const getSalesVoucherRequest = asyncHandler(async (req, res) => {
-  const request = await readSalesVoucher(req.client.client_id, req.params.requestId);
-  if (!request || request.transaction_type !== "sales_voucher") {
-    return failureResponse(res, { code: 2004, httpStatus: 404, message: "Sales Voucher request not found." });
-  }
-  return successResponse(res, { code: 1000, httpStatus: 200, message: "Sales Voucher request retrieved.", data: request });
-});
+const voucherHandlers = createVoucherHandlers({ label: "Sales Voucher", field: "sales_order", kind: "sales_voucher", validate: validateSalesVoucherRequest, queue: queueSalesVoucher, read: readSalesVoucher });
+export const pushSalesVoucher = voucherHandlers.push;
+export const getSalesVoucherRequest = voucherHandlers.getRequest;
 
 export const requestSalesVoucherPdfDownload = asyncHandler(async (req, res) => {
   const result = await requestSalesVoucherPdf(req.client.client_id, req.params.requestId, { retry: req.query.retry === "true" });
@@ -75,7 +21,7 @@ export const requestSalesVoucherPdfDownload = asyncHandler(async (req, res) => {
 });
 
 export const requestSalesVoucherPdfDownloadByNumber = asyncHandler(async (req, res) => {
-  const { lookup, errors } = validateSalesPdfLookup(req.query);
+  const { lookup, errors } = validateVoucherLookup(req.query);
   if (errors.length) return failureResponse(res, { code: 2001, httpStatus: 400, message: "company, ledger_name and voucher_no are required; voucher_date is optional.", data: { errors } });
   const result = await requestSalesVoucherPdfByNumber(req.client.client_id, lookup.company, lookup.voucherNumber, { retry: req.query.retry === "true", partyLedger: lookup.ledgerName, voucherDate: lookup.voucherDate });
   return sendSalesVoucherPdf(res, result, result.requestId);
