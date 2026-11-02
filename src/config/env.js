@@ -29,7 +29,8 @@ export const env = {
   legacyUploadsDir: process.env.LEGACY_UPLOADS_DIR || "uploads",
   legacyTimezone: process.env.LEGACY_TIMEZONE || "Asia/Kolkata",
   legacyEncryptionKey: process.env.LEGACY_ENCRYPTION_KEY || "KFjfdJFNBBKIRMICdkf45",
-  jwtSecret: process.env.JWT_SECRET || "1132e486f42b1f714fae447fcdab07f1ea819b4f7b997864c8b5f4869e148811",
+  jwtSecret:
+    process.env.JWT_SECRET || "1132e486f42b1f714fae447fcdab07f1ea819b4f7b997864c8b5f4869e148811",
   jwtExpire: process.env.JWT_EXPIRE || "1d",
 
   EMAIL_USER: process.env.EMAIL_USER || "",

@@ -32,7 +32,9 @@ export function verifyConsoleCredentials(username, password) {
 
 export function createConsoleSession(username) {
   const { password } = getConsoleCredentials();
-  const payload = Buffer.from(JSON.stringify({ username, expiresAt: Date.now() + SESSION_TTL_MS })).toString("base64url");
+  const payload = Buffer.from(
+    JSON.stringify({ username, expiresAt: Date.now() + SESSION_TTL_MS }),
+  ).toString("base64url");
   return `${payload}.${signature(payload, password)}`;
 }
 
@@ -47,7 +49,12 @@ export function verifyConsoleSession(token) {
 
   try {
     const session = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-    if (session.username !== credentials.username || !Number.isFinite(session.expiresAt) || session.expiresAt <= Date.now()) return null;
+    if (
+      session.username !== credentials.username ||
+      !Number.isFinite(session.expiresAt) ||
+      session.expiresAt <= Date.now()
+    )
+      return null;
     return { username: session.username, expiresAt: session.expiresAt };
   } catch {
     return null;

@@ -28,7 +28,9 @@ if (!clientId || !/^[A-Za-z0-9_-]{1,100}$/.test(clientId)) {
     console.info("Connector key (store in the Connector app; shown only once):");
     console.info(connectorKey);
   } catch (error) {
-    console.error(error.code === 11000 ? "That client_id already exists." : "Could not create client.");
+    console.error(
+      error.code === 11000 ? "That client_id already exists." : "Could not create client.",
+    );
     if (process.env.NODE_ENV !== "production") console.error(error.message);
     process.exitCode = 1;
   }

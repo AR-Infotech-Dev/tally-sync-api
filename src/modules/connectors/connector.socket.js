@@ -1,8 +1,15 @@
-import { connectorJobSignal, getConnectorJobType } from "../connector-jobs/connector-job.registry.js";
+import {
+  connectorJobSignal,
+  getConnectorJobType,
+} from "../connector-jobs/connector-job.registry.js";
 import { matchesCredentialHash } from "../../shared/utils/credentialHash.js";
 import { SOCKET_EVENTS } from "../../socket/utils/events.js";
 import { connectorRoom } from "../../socket/utils/rooms.js";
-import { findQueuedConnectorJobs, markConnectorJobProcessing, updateConnectorJob } from "../connector-jobs/connector-job.model.js";
+import {
+  findQueuedConnectorJobs,
+  markConnectorJobProcessing,
+  updateConnectorJob,
+} from "../connector-jobs/connector-job.model.js";
 import { findActiveClient } from "../clients/client.model.js";
 import { recordConsoleLog } from "../console/consoleLog.store.js";
 import { dispatchPendingSalesVoucherPdfs } from "../sales/sales-pdf.service.js";
@@ -15,7 +22,11 @@ async function emitPendingConnectorJobs(clientId, socket) {
   }
   if (requests.length) {
     console.info("Queued jobs sent to connector:", { clientId, count: requests.length });
-    recordConsoleLog("info", "Queued sales order signals dispatched", { source: "socket", clientId, count: requests.length });
+    recordConsoleLog("info", "Queued sales order signals dispatched", {
+      source: "socket",
+      clientId,
+      count: requests.length,
+    });
   }
 }
 
@@ -41,26 +52,58 @@ export function registerConnectorSocketHandlers(socket) {
       client = await findActiveClient(clientId);
     } catch (error) {
       const cause = error.cause || error;
-      const safeMessage = String(cause.message || error.message)
-        .replace(/mongodb(?:\+srv)?:\/\/[^\s"'`]+/gi, "[redacted MongoDB URI]");
+      const safeMessage = String(cause.message || error.message).replace(
+        /mongodb(?:\+srv)?:\/\/[^\s"'`]+/gi,
+        "[redacted MongoDB URI]",
+      );
       console.error("Connector authentication lookup failed:", {
         name: cause.name || error.name,
         code: cause.code || cause.codeName || "unknown",
         message: safeMessage,
       });
-      recordConsoleLog("error", "Connector registration lookup failed", { source: "socket", clientId, socketId: socket.id, code: cause.code || "unknown" });
-      ack({ success: false, code: "REGISTRATION_UNAVAILABLE", message: "Connector registration is temporarily unavailable." });
+      recordConsoleLog("error", "Connector registration lookup failed", {
+        source: "socket",
+        clientId,
+        socketId: socket.id,
+        code: cause.code || "unknown",
+      });
+      ack({
+        success: false,
+        code: "REGISTRATION_UNAVAILABLE",
+        message: "Connector registration is temporarily unavailable.",
+      });
       return;
     }
     const connectorKeyHash = client?.connector_key_hash;
-    if (!connectorKeyHash || !/^[a-f0-9]{64}$/i.test(connectorKeyHash) || typeof payload.connector_key !== "string") {
-      recordConsoleLog("warn", "Connector registration rejected: invalid client or connector credentials", { source: "socket", clientId, connectorId, socketId: socket.id });
-      ack({ success: false, code: "CONNECTOR_UNAUTHORIZED", message: "Invalid connector credentials." });
+    if (
+      !connectorKeyHash ||
+      !/^[a-f0-9]{64}$/i.test(connectorKeyHash) ||
+      typeof payload.connector_key !== "string"
+    ) {
+      recordConsoleLog(
+        "warn",
+        "Connector registration rejected: invalid client or connector credentials",
+        { source: "socket", clientId, connectorId, socketId: socket.id },
+      );
+      ack({
+        success: false,
+        code: "CONNECTOR_UNAUTHORIZED",
+        message: "Invalid connector credentials.",
+      });
       return;
     }
     if (!matchesCredentialHash(payload.connector_key, connectorKeyHash)) {
-      recordConsoleLog("warn", "Connector registration rejected: key did not match", { source: "socket", clientId, connectorId, socketId: socket.id });
-      ack({ success: false, code: "CONNECTOR_UNAUTHORIZED", message: "Invalid connector credentials." });
+      recordConsoleLog("warn", "Connector registration rejected: key did not match", {
+        source: "socket",
+        clientId,
+        connectorId,
+        socketId: socket.id,
+      });
+      ack({
+        success: false,
+        code: "CONNECTOR_UNAUTHORIZED",
+        message: "Invalid connector credentials.",
+      });
       return;
     }
 
@@ -86,18 +129,37 @@ export function registerConnectorSocketHandlers(socket) {
       message: "Test signal from Tally Sync Server.",
       at: new Date().toISOString(),
     });
-    emitPendingConnectorJobs(clientId, socket)
-      .catch((error) => {
-        console.error("Could not dispatch queued sales orders:", error.message);
-        recordConsoleLog("error", "Could not dispatch queued sales orders", { source: "socket", clientId, connectorId });
+    emitPendingConnectorJobs(clientId, socket).catch((error) => {
+      console.error("Could not dispatch queued sales orders:", error.message);
+      recordConsoleLog("error", "Could not dispatch queued sales orders", {
+        source: "socket",
+        clientId,
+        connectorId,
       });
+    });
     dispatchPendingSalesVoucherPdfs(clientId, socket)
       .then((count) => {
-        if (count) recordConsoleLog("info", "Queued Sales Voucher PDF export signals dispatched", { source: "socket", clientId, count });
+        if (count)
+          recordConsoleLog("info", "Queued Sales Voucher PDF export signals dispatched", {
+            source: "socket",
+            clientId,
+            count,
+          });
       })
-      .catch((error) => recordConsoleLog("error", "Could not dispatch queued Sales Voucher PDF exports", { source: "socket", clientId, message: error.message }));
+      .catch((error) =>
+        recordConsoleLog("error", "Could not dispatch queued Sales Voucher PDF exports", {
+          source: "socket",
+          clientId,
+          message: error.message,
+        }),
+      );
     console.info("Connector registered:", { clientId, connectorId, socketId: socket.id });
-    recordConsoleLog("success", "Connector registered", { source: "socket", clientId, connectorId, socketId: socket.id });
+    recordConsoleLog("success", "Connector registered", {
+      source: "socket",
+      clientId,
+      connectorId,
+      socketId: socket.id,
+    });
   });
 
   socket.on(SOCKET_EVENTS.connectorHeartbeat, (_payload = {}, acknowledge = () => {}) => {
@@ -113,24 +175,27 @@ export function registerConnectorSocketHandlers(socket) {
     socket.emit(SOCKET_EVENTS.connectorHeartbeatAck, result);
     // Recover queued work if a one-time push signal was missed while this
     // authenticated socket stayed connected.
-    emitPendingConnectorJobs(socket.data.clientId, socket)
-      .catch((error) => {
-        console.error("Could not reconcile queued sales orders:", error.message);
-        recordConsoleLog("error", "Could not reconcile queued sales orders", {
-          source: "socket",
-          clientId: socket.data.clientId,
-          connectorId: socket.data.connectorId,
-        });
+    emitPendingConnectorJobs(socket.data.clientId, socket).catch((error) => {
+      console.error("Could not reconcile queued sales orders:", error.message);
+      recordConsoleLog("error", "Could not reconcile queued sales orders", {
+        source: "socket",
+        clientId: socket.data.clientId,
+        connectorId: socket.data.connectorId,
       });
+    });
     dispatchPendingSalesVoucherPdfs(socket.data.clientId, socket)
       .then((count) => {
         if (count) {
-          recordConsoleLog("info", "Queued Sales Voucher PDF export signals redispatched after heartbeat", {
-            source: "socket",
-            clientId: socket.data.clientId,
-            connectorId: socket.data.connectorId,
-            count,
-          });
+          recordConsoleLog(
+            "info",
+            "Queued Sales Voucher PDF export signals redispatched after heartbeat",
+            {
+              source: "socket",
+              clientId: socket.data.clientId,
+              connectorId: socket.data.connectorId,
+              count,
+            },
+          );
         }
       })
       .catch((error) => {
@@ -146,9 +211,20 @@ export function registerConnectorSocketHandlers(socket) {
 
   socket.on(SOCKET_EVENTS.connectorAck, (payload = {}) => {
     if (!socket.data.clientId) return;
-    if ([SOCKET_EVENTS.salesOrderPush, SOCKET_EVENTS.salesVoucherPush, SOCKET_EVENTS.receiptVoucherPush, SOCKET_EVENTS.purchaseOrderPush, SOCKET_EVENTS.purchaseVoucherPush, SOCKET_EVENTS.paymentVoucherPush].includes(payload.event) && typeof payload.request_id === "string") {
-      markConnectorJobProcessing(socket.data.clientId, payload.request_id)
-        .catch((error) => console.error("Could not mark transaction as processing:", error.message));
+    if (
+      [
+        SOCKET_EVENTS.salesOrderPush,
+        SOCKET_EVENTS.salesVoucherPush,
+        SOCKET_EVENTS.receiptVoucherPush,
+        SOCKET_EVENTS.purchaseOrderPush,
+        SOCKET_EVENTS.purchaseVoucherPush,
+        SOCKET_EVENTS.paymentVoucherPush,
+      ].includes(payload.event) &&
+      typeof payload.request_id === "string"
+    ) {
+      markConnectorJobProcessing(socket.data.clientId, payload.request_id).catch((error) =>
+        console.error("Could not mark transaction as processing:", error.message),
+      );
     }
     console.info("Connector event ACK:", {
       clientId: socket.data.clientId,
@@ -176,11 +252,23 @@ export function registerConnectorSocketHandlers(socket) {
         tally_result: payload.tally_result,
       });
       const transactionLabel = getConnectorJobType(payload.transaction_type).label;
-      console.info(`${transactionLabel} job update:`, { clientId: socket.data.clientId, requestId: payload.request_id, status: payload.status });
-      recordConsoleLog(payload.status === "failed" ? "error" : payload.status === "succeeded" ? "success" : "info", `${transactionLabel} ${payload.status}`, { source: "job", clientId: socket.data.clientId, requestId: payload.request_id });
+      console.info(`${transactionLabel} job update:`, {
+        clientId: socket.data.clientId,
+        requestId: payload.request_id,
+        status: payload.status,
+      });
+      recordConsoleLog(
+        payload.status === "failed" ? "error" : payload.status === "succeeded" ? "success" : "info",
+        `${transactionLabel} ${payload.status}`,
+        { source: "job", clientId: socket.data.clientId, requestId: payload.request_id },
+      );
     } catch (error) {
       console.error("Could not save sales order result:", error.message);
-      recordConsoleLog("error", "Could not save sales order result", { source: "job", clientId: socket.data.clientId, requestId: payload.request_id });
+      recordConsoleLog("error", "Could not save sales order result", {
+        source: "job",
+        clientId: socket.data.clientId,
+        requestId: payload.request_id,
+      });
     }
   });
 }

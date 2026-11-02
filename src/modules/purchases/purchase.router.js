@@ -5,7 +5,12 @@ import { requireConnectorKey } from "../../middlewares/connectorApiKey.middlewar
 import { getPurchaseRequest, pushPurchase } from "./purchase.controller.js";
 
 const router = express.Router();
-router.post("/push", requireClientApiKey, requireConnectedConnector, pushPurchase("purchase_voucher"));
+router.post(
+  "/push",
+  requireClientApiKey,
+  requireConnectedConnector,
+  pushPurchase("purchase_voucher"),
+);
 router.get("/:requestId", requireClientApiKey, getPurchaseRequest("purchase_voucher"));
 router.get("/:requestId/connector", requireConnectorKey, getPurchaseRequest("purchase_voucher"));
 export default router;

@@ -7,7 +7,7 @@ export const httpStatusCodes = {
   201: "CREATED",
   204: "NO_CONTENT",
   400: "BAD_REQUEST",
-  401: "UNAUTHORIZED",  
+  401: "UNAUTHORIZED",
   403: "FORBIDDEN",
   404: "NOT_FOUND",
   405: "METHOD_NOT_ALLOWED",
@@ -19,7 +19,7 @@ export const httpStatusCodes = {
   500: "INTERNAL_SERVER_ERROR",
   502: "BAD_GATEWAY",
   503: "SERVICE_UNAVAILABLE",
-  504: "GATEWAY_TIMEOUT"
+  504: "GATEWAY_TIMEOUT",
 };
 
 // ===============================
@@ -33,7 +33,7 @@ export const successMessages = {
   1004: "Fetched successfully",
   1005: "Login successful",
   1006: "Logout successful",
-  1007: "DB connection Successfull"
+  1007: "DB connection Successfull",
 };
 
 // ===============================

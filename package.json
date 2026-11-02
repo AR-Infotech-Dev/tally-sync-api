@@ -19,6 +19,8 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "test": "node --test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "check:imports": "node --input-type=module -e \"await import('./src/app.js')\"",
     "start": "node src/server.js",
     "routes": "node src/scripts/printRoutes.js",
@@ -37,5 +39,8 @@
     "nodemailer": "^10.0.16",
     "puppeteer": "^25.16.0",
     "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "prettier": "3.9.10"
   }
 }

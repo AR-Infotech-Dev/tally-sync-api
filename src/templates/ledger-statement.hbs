@@ -1,345 +1,314 @@
 <!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Ledger statement - {{ledger_name}}</title>
+  </head>
+  <style>
+      /* Print styles for this report. Edit the layout here. */
+      html {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
 
-<head>
-  <meta charset="utf-8">
-  <title>Ledger statement - {{ledger_name}}</title>
+      body {
+        font-family: Report-latin, Report-devanagari, sans-serif;
+        font-size: 14px;
+        line-height: 1.3;
+        color: #111;
+        margin: 0;
+      }
 
-</head>
-<style>
-  /* Print styles for this report. Edit the layout here. */
-  html {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 3px;
+      }
 
-  body {
-    font-family: Report-latin, Report-devanagari, sans-serif;
-    font-size: 14px;
-    line-height: 1.3;
-    color: #111;
-    margin: 0;
-  }
+      h2 {
+        font-size: 16px;
+        margin: 0 0 8px;
+      }
 
-  h1 {
-    font-size: 20px;
-    margin: 0 0 3px;
-  }
+      p {
+        margin: 0 0 3px;
+      }
 
-  h2 {
-    font-size: 16px;
-    margin: 0 0 8px;
-  }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 12px;
+        table-layout: auto;
+      }
 
-  p {
-    margin: 0 0 3px;
-  }
+      thead {
+        display: table-header-group;
+      }
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 12px;
-    table-layout: auto;
-  }
+      tfoot {
+        display: table-footer-group;
+      }
 
-  thead {
-    display: table-header-group;
-  }
+      tr {
+        break-inside: avoid;
+      }
 
-  tfoot {
-    display: table-footer-group;
-  }
+      th,
+      td {
+        padding: 4px 5px;
+        vertical-align: top;
+        overflow-wrap: anywhere;
+      }
 
-  tr {
-    break-inside: avoid;
-  }
+      /*
+    th {
+        background: white;
+        border-top: 1px solid #444;
+        border-bottom: 1px solid #444;
+    } */
 
-  th,
-  td {
-    padding: 4px 5px;
-    vertical-align: top;
-    overflow-wrap: anywhere;
-  }
+      th:first-child,
+      td:first-child {
+        text-align: left;
+      }
 
-  /* 
-th {
-    background: white;
-    border-top: 1px solid #444;
-    border-bottom: 1px solid #444;
-} */
+      .number,
+      .amount {
+        text-align: right;
+        white-space: nowrap;
+      }
 
-  th:first-child,
-  td:first-child {
-    text-align: left;
-  }
+      .border-top {
+        border-top: 1px solid #444;
+      }
 
-  .number,
-  .amount {
-    text-align: right;
-    white-space: nowrap;
-  }
+      .muted,
+      .narration,
+      .type,
+      .note {
+        color: #666;
+        font-size: 12px;
+      }
 
-  .border-top {
-    border-top: 1px solid #444;
-  }
+      .stale {
+        color: #8d5900;
+        background: #fff5df;
+      }
 
-  .muted,
-  .narration,
-  .type,
-  .note {
-    color: #666;
-    font-size: 12px;
-  }
+      .report-heading {
+        margin: 8px 0 12px;
+        text-align: center;
+      }
 
-  .stale {
-    color: #8d5900;
-    background: #fff5df;
-  }
+      .indent {
+        padding-left: 20px;
+      }
 
-  .report-heading {
-    margin: 8px 0 12px;
-    text-align: center;
-  }
+      .group-summary thead th {
+        border: 1px solid #444;
+      }
 
-  .indent {
-    padding-left: 20px;
-  }
+      .border-none {
+        border: none !important;
+      }
 
-  .group-summary thead th {
-    border: 1px solid #444;
-  }
+      .border-top {
+        border-top: 1px solid #69768a !important;
+      }
+  </style>
 
-  .border-none {
-    border: none !important;
-  }
-
-  .border-top {
-    border-top: 1px solid #69768a !important;
-  }
-
-</style>
-
-<body>
-  <h1 class="text-center font-xl">{{company}}</h1>
-  {{#each company_address}}
-  <p class="text-center font-lg">{{this}}</p>
-  {{/each}}
-  {{#if company_email}}
-  <p class="text-center font-lg">E-Mail: {{company_email}}</p>
-  {{/if}}
-  <p class="ledger" style="text-align:center">
-    <strong>{{ledger_name}}</strong>
-    <br>
-    Ledger Account
-  </p>
-  <p style="text-align:center">{{period_from}} to {{period_to}}<br><span class="muted">{{format_label}}</span></p>
-  {{#if is_stale}}
-  <p class="stale">Cached data - latest Tally changes may not be included.</p>
-  {{/if}}
-  {{#if bank_details_unavailable}}
-  <p class="stale">Payment mode and bank details are not synced yet. Update the
-    Connector and complete a sync.</p>
-  {{/if}}
-  {{#if details_unavailable}}
-  <p class="stale">Detailed item and bill breakup is not synced yet. Update the Connector and
-    complete a sync.</p>
-  {{/if}}
-  <table style="margin-top:6px;margin-bottom:8px">
-    <thead>
-      <tr class="border-top border-bottom">
-        <th class="font-normal">Date</th>
-        <th>Particulars</th>
-        <th class="font-normal text-right">Vch Type</th>
-        {{#if showVoucherNo}}
-        <th class="font-normal text-right">Vch No.</th>
-        {{/if}}
-        <th class="number font-bold">Debit</th>
-        <th class="number font-bold">Credit</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{#if has_opening}}
-      <tr>
-        <td></td>
-        <td><strong>{{opening_direction}} Opening Balance</strong></td>
-        <td></td>
-        {{#if showVoucherNo}}
-        <td></td>
-        {{/if}}
-        <td class="number">{{opening_debit}}</td>
-        <td class="number">{{opening_credit}}</td>
-      </tr>
-      {{/if}}
-      {{#each entries}}
-      <tr {{#if stripe}}
-        style="background-color:#f1f5fa"
-        {{/if}}
-        >
-        <td {{#if stripe}}
-          style="background-color:#f1f5fa"
+  <body>
+    <h1 class="text-center font-xl">{{company}}</h1>
+    {{#each company_address}}
+    <p class="text-center font-lg">{{this}}</p>
+    {{/each}} {{#if company_email}}
+    <p class="text-center font-lg">E-Mail: {{company_email}}</p>
+    {{/if}}
+    <p class="ledger" style="text-align:center">
+      <strong>{{ledger_name}}</strong>
+      <br />
+      Ledger Account
+    </p>
+    <p style="text-align:center"
+      >{{period_from}} to {{period_to}}<br /><span class="muted">{{format_label}}</span></p
+    >
+    {{#if is_stale}}
+    <p class="stale">Cached data - latest Tally changes may not be included.</p>
+    {{/if}} {{#if bank_details_unavailable}}
+    <p class="stale"
+      >Payment mode and bank details are not synced yet. Update the Connector and complete a
+      sync.</p
+    >
+    {{/if}} {{#if details_unavailable}}
+    <p class="stale"
+      >Detailed item and bill breakup is not synced yet. Update the Connector and complete a
+      sync.</p
+    >
+    {{/if}}
+    <table style="margin-top:6px;margin-bottom:8px">
+      <thead>
+        <tr class="border-top border-bottom">
+          <th class="font-normal">Date</th>
+          <th>Particulars</th>
+          <th class="font-normal text-right">Vch Type</th>
+          {{#if showVoucherNo}}
+          <th class="font-normal text-right">Vch No.</th>
           {{/if}}
-          >{{display_date}}
-        </td>
-        <td {{#if stripe}}
-          style="background-color:#f1f5fa"
+          <th class="number font-bold">Debit</th>
+          <th class="number font-bold">Credit</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#if has_opening}}
+        <tr>
+          <td></td>
+          <td><strong>{{opening_direction}} Opening Balance</strong></td>
+          <td></td>
+          {{#if showVoucherNo}}
+          <td></td>
           {{/if}}
-          >{{direction}} <strong>{{primary_particular}}</strong>
-        </td>
-        <td class="text-right font-bold" {{#if stripe}}
-          style="background-color:#f1f5fa"
+          <td class="number">{{opening_debit}}</td>
+          <td class="number">{{opening_credit}}</td>
+        </tr>
+        {{/if}} {{#each entries}}
+        <tr {{#if stripe}} style="background-color:#f1f5fa" {{/if}}>
+          <td {{#if stripe}} style="background-color:#f1f5fa" {{/if}}>{{display_date}} </td>
+          <td {{#if stripe}} style="background-color:#f1f5fa" {{/if}}
+            >{{direction}} <strong>{{primary_particular}}</strong>
+          </td>
+          <td class="text-right font-bold" {{#if stripe}} style="background-color:#f1f5fa" {{/if}}> {{voucher_type}} </td>
+          {{#if @root.showVoucherNo}}
+          <td class="text-right" {{#if stripe}} style="background-color:#f1f5fa" {{/if}}>{{voucher_no}} </td>
           {{/if}}
+          <td class="number" {{#if stripe}} style="background-color:#f1f5fa" {{/if}}>{{debit_display}} </td>
+          <td class="number" {{#if stripe}} style="background-color:#f1f5fa" {{/if}}>{{credit_display}} </td>
+        </tr>
+
+        {{#if inventory_entries}}
+        <tr>
+          <td></td>
+          <td colspan="2">
+            <table>
+              <tbody>
+                {{#each inventory_entries}}
+                <tr>
+                  <td class="narration" style="color: #000000; font-size: 14px; font-weight:500;"
+                    >{{stock_item}}</td
+                  >
+                  <td
+                    class="narration"
+                    colspan="2"
+                    style="color: #000000; font-size: 14px; font-weight:500;"
+                  >
+                    <span class="number"> {{quantity}}</span>
+                    <span class="number">{{rate}}</span>
+                    <span class="number">{{amount}}</span>
+                  </td>
+                  <td colspan="1"></td>
+                </tr>
+                {{/each}}
+              </tbody>
+            </table>
+          </td>
+          {{#if @root.showVoucherNo}}
+          <td></td>
+          {{/if}}
+          <td></td>
+          <td></td>
+        </tr>
+        {{/if}} {{#if bill_allocations}}
+        <tr>
+          <td></td>
+          <td colspan="{{@root.detail_colspan}}">
+            <table>
+              <tbody>
+                {{#each bill_allocations}}
+                <tr>
+                  <td class="narration">{{type}}</td>
+                  <td class="narration" colspan="2" style="color:#000000">
+                    <span>{{reference}}</span>
+                    <strong>{{amount}}</strong>
+                    <strong>{{direction}}</strong>
+                  </td>
+                  <td class="narration number" colspan="1"></td>
+                </tr>
+                {{/each}}
+              </tbody>
+            </table>
+          </td>
+          <td></td>
+          <td></td>
+        </tr>
+        {{/if}} {{#if @root.isDetailed}} {{#if additional_particulars}}
+        <tr>
+          <td></td>
+          <td colspan="{{@root.detail_colspan}}" class="narration"
+            >Other ledgers: {{additional_particulars}}</td
           >
-          {{voucher_type}}
-        </td>
-        {{#if @root.showVoucherNo}}
-        <td class="text-right" {{#if stripe}}
-          style="background-color:#f1f5fa"
+          <td></td>
+          <td></td>
+        </tr>
+        {{/if}} {{/if}} {{#if @root.showNarrations}} {{#if narration}}
+        <tr>
+          <td></td>
+          <td colspan="{{@root.detail_colspan}}" class="narration">{{narration}}</td>
+          <td></td>
+          <td></td>
+        </tr>
+        {{/if}} {{/if}} {{#if payment_modes}}
+        <tr>
+          <td></td>
+          <td colspan="{{@root.detail_colspan}}" class="narration"
+            >Mode of Payment/Receipt: {{payment_modes}}</td
+          >
+          <td></td>
+          <td></td>
+        </tr>
+        {{/if}} {{#each bank_allocations}}
+        <tr>
+          <td></td>
+          <td colspan="{{@root.detail_colspan}}" class="narration"
+            >Bank: {{bank_name}} {{instrument_number}} {{instrument_date}} {{status}}</td
+          >
+          <td></td>
+          <td></td>
+        </tr>
+        {{/each}} {{else}}
+        <tr>
+          <td colspan="{{column_count}}" style="text-align:center;color:#69768a"
+            >No transactions in this period.</td
+          >
+        </tr>
+        {{/each}}
+        <tr class="border-none" style="border: none !important;">
+          <td colspan="{{summary_colspan}}"></td>
+          <td class="number border-top" style="border-top:0.5px solid #000000;">
+            <strong>{{subtotal_debit}}</strong>
+          </td>
+          <td class="number border-top" style="border-top:0.5px solid #000000; color:#000000">
+            <strong>{{subtotal_credit}}</strong>
+          </td>
+        </tr>
+        <tr class="border-none" style="border: none !important;">
+          <td></td>
+          <td><strong>{{closing_direction}} Closing Balance</strong></td>
+          <td></td>
+          {{#if showVoucherNo}}
+          <td></td>
           {{/if}}
-          >{{voucher_no}}
-        </td>
-        {{/if}}
-        <td class="number" {{#if stripe}}
-          style="background-color:#f1f5fa"
-          {{/if}}
-          >{{debit_display}}
-        </td>
-        <td class="number" {{#if stripe}}
-          style="background-color:#f1f5fa"
-          {{/if}}
-          >{{credit_display}}
-        </td>
-      </tr>
-
-      {{#if inventory_entries}}
-      <tr>
-        <td></td>
-        <td colspan="2">
-          <table>
-            <tbody>
-              {{#each inventory_entries}}
-              <tr>
-                <td class="narration" style="color: #000000; font-size: 14px; font-weight:500;">{{stock_item}}</td>
-                <td class="narration" colspan="2" style="color: #000000; font-size: 14px; font-weight:500;">
-                  <span class="number"> {{quantity}}</span>
-                  <span class="number">{{rate}}</span>
-                  <span class="number">{{amount}}</span>
-                </td>
-                <td colspan="1"></td>
-              </tr>
-              {{/each}}
-            </tbody>
-          </table>
-        </td>
-        {{#if @root.showVoucherNo}}
-        <td></td>
-        {{/if}}
-        <td></td>
-        <td></td>
-      </tr>
-      {{/if}}
-      {{#if bill_allocations}}
-      <tr>
-        <td></td>
-        <td colspan="{{@root.detail_colspan}}">
-          <table>
-            <tbody>
-              {{#each bill_allocations}}
-              <tr>
-                <td class="narration">{{type}}</td>
-                <td class="narration" colspan="2" style="color:#000000">
-                  <span>{{reference}}</span>
-                  <strong>{{amount}}</strong>
-                  <strong>{{direction}}</strong>
-                </td>
-                <td class="narration number" colspan="1"></td>
-              </tr>
-              {{/each}}
-            </tbody>
-          </table>
-        </td>
-        <td></td>
-        <td></td>
-      </tr>
-      {{/if}}
-      {{#if @root.isDetailed}}
-
-      {{#if additional_particulars}}
-      <tr>
-        <td></td>
-        <td colspan="{{@root.detail_colspan}}" class="narration">Other ledgers: {{additional_particulars}}</td>
-        <td></td>
-        <td></td>
-      </tr>
-      {{/if}}
-      {{/if}}
-
-      {{#if @root.showNarrations}}
-
-      {{#if narration}}
-      <tr>
-        <td></td>
-        <td colspan="{{@root.detail_colspan}}" class="narration">{{narration}}</td>
-        <td></td>
-        <td></td>
-      </tr>
-      {{/if}}
-
-      {{/if}}
-      {{#if payment_modes}}
-      <tr>
-        <td></td>
-        <td colspan="{{@root.detail_colspan}}" class="narration">Mode of Payment/Receipt: {{payment_modes}}</td>
-        <td></td>
-        <td></td>
-      </tr>
-      {{/if}}
-      {{#each bank_allocations}}
-      <tr>
-        <td></td>
-        <td colspan="{{@root.detail_colspan}}" class="narration">Bank: {{bank_name}} {{instrument_number}}
-          {{instrument_date}} {{status}}</td>
-        <td></td>
-        <td></td>
-      </tr>
-      {{/each}}
-      {{else}}
-      <tr>
-        <td colspan="{{column_count}}" style="text-align:center;color:#69768a">No transactions in this period.</td>
-      </tr>
-      {{/each}}
-      <tr class="border-none" style="border: none !important;">
-        <td colspan="{{summary_colspan}}"></td>
-        <td class="number border-top" style="border-top:0.5px solid #000000;">
-          <strong>{{subtotal_debit}}</strong>
-        </td>
-        <td class="number border-top" style="border-top:0.5px solid #000000; color:#000000">
-          <strong>{{subtotal_credit}}</strong>
-        </td>
-      </tr>
-      <tr class="border-none" style="border: none !important;">
-        <td></td>
-        <td><strong>{{closing_direction}} Closing Balance</strong></td>
-        <td></td>
-        {{#if showVoucherNo}}
-        <td></td>
-        {{/if}}
-        <td class="number" style="color:#000000;">
-          {{closing_debit}}
-        </td>
-        <td class="number" style="color:#000000;">{{closing_credit}}</td>
-      </tr>
-      <tr style="border: none !important;">
-        <td colspan="{{summary_colspan}}"></td>
-        <td class="number border-top" style="border-top:1px solid #000000; color:#000000;">
-          <strong>{{grand_debit}}</strong>
-        </td>
-        <td class="number border-top" style="border-top:1px solid #000000; color:#000000;">
-          <strong>{{grand_credit}}</strong>
-        </td>
-      </tr>
-    </tbody>
-  </table>
-  <p class="note">Amounts in company base currency.</p>
-</body>
-
+          <td class="number" style="color:#000000;"> {{closing_debit}} </td>
+          <td class="number" style="color:#000000;">{{closing_credit}}</td>
+        </tr>
+        <tr style="border: none !important;">
+          <td colspan="{{summary_colspan}}"></td>
+          <td class="number border-top" style="border-top:1px solid #000000; color:#000000;">
+            <strong>{{grand_debit}}</strong>
+          </td>
+          <td class="number border-top" style="border-top:1px solid #000000; color:#000000;">
+            <strong>{{grand_credit}}</strong>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="note">Amounts in company base currency.</p>
+  </body>
 </html>

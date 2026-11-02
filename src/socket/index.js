@@ -5,68 +5,97 @@ import { registerConnectorSocketHandlers } from "../modules/connectors/connector
 import { recordConsoleLog } from "../modules/console/consoleLog.store.js";
 let io = null;
 export const initSocket = (server) => {
-    io = new Server(server, {
-        cors: {
-            origin: "*",
-            methods: ["GET", "POST"]
-        }
-    });
+  io = new Server(server, {
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST"],
+    },
+  });
 
-    io.on("connection", (socket) => {
-        console.info("Socket connected:", socket.id);
-        recordConsoleLog("info", "Socket transport connected", { source: "socket", socketId: socket.id });
-        registerConnectorSocketHandlers(socket);
-        socket.on("disconnect", (reason) => {
-            console.info("Socket disconnected:", socket.id, reason);
-            recordConsoleLog("warn", "Socket transport disconnected", { source: "socket", socketId: socket.id, reason });
-        });
+  io.on("connection", (socket) => {
+    console.info("Socket connected:", socket.id);
+    recordConsoleLog("info", "Socket transport connected", {
+      source: "socket",
+      socketId: socket.id,
     });
-    console.info("Socket Initialized");
+    registerConnectorSocketHandlers(socket);
+    socket.on("disconnect", (reason) => {
+      console.info("Socket disconnected:", socket.id, reason);
+      recordConsoleLog("warn", "Socket transport disconnected", {
+        source: "socket",
+        socketId: socket.id,
+        reason,
+      });
+    });
+  });
+  console.info("Socket Initialized");
 };
 export const getIO = () => {
-    if (!io) { throw new Error("Socket not initialized"); }
-    return io;
+  if (!io) {
+    throw new Error("Socket not initialized");
+  }
+  return io;
 };
 
 export function listRegisteredConnectors() {
-    if (!io) return [];
-    return [...io.sockets.sockets.values()]
-        .filter((socket) => socket.connected && socket.data?.clientId && socket.data?.connectorId)
-        .map((socket) => ({
-            clientId: socket.data.clientId,
-            connectorId: socket.data.connectorId,
-            socketId: socket.id,
-            registeredAt: socket.data.registeredAt || null,
-            lastSeenAt: socket.data.lastSeenAt || null,
-        }));
+  if (!io) return [];
+  return [...io.sockets.sockets.values()]
+    .filter((socket) => socket.connected && socket.data?.clientId && socket.data?.connectorId)
+    .map((socket) => ({
+      clientId: socket.data.clientId,
+      connectorId: socket.data.connectorId,
+      socketId: socket.id,
+      registeredAt: socket.data.registeredAt || null,
+      lastSeenAt: socket.data.lastSeenAt || null,
+    }));
 }
 
 export const emit = (userId, event = "new_notification", payload = {}) => {
-    try {
-        if (!io || !userId) return;
-        io.to(userRoom(userId)).emit(event, payload);
-    } catch (error) {
-        console.error("Socket Emit Error :", error.message);
-    }
+  try {
+    if (!io || !userId) return;
+    io.to(userRoom(userId)).emit(event, payload);
+  } catch (error) {
+    console.error("Socket Emit Error :", error.message);
+  }
 };
 
 export const emitToConnector = (clientId, event, payload = {}) => {
-    if (!io || !clientId || !event) return false;
-    const roomName = connectorRoom(clientId);
-    if (!io.sockets.adapter.rooms.get(roomName)?.size) return false;
-    io.to(roomName).emit(event, payload);
-    return true;
+  if (!io || !clientId || !event) return false;
+  const roomName = connectorRoom(clientId);
+  if (!io.sockets.adapter.rooms.get(roomName)?.size) return false;
+  io.to(roomName).emit(event, payload);
+  return true;
 };
 
 export function requestConnector(clientId, event, payload = {}, timeoutMs = 10_000) {
-    if (!io || !clientId || !event) return Promise.reject(Object.assign(new Error("Connector is not available."), { code: "CONNECTOR_NOT_CONNECTED" }));
-    const socket = [...io.sockets.sockets.values()].find((candidate) => candidate.connected && candidate.data?.clientId === clientId && candidate.data?.connectorId);
-    if (!socket) return Promise.reject(Object.assign(new Error("Connector is not connected."), { code: "CONNECTOR_NOT_CONNECTED" }));
-    return new Promise((resolve, reject) => {
-        socket.timeout(timeoutMs).emit(event, payload, (error, response) => {
-            if (error) return reject(Object.assign(new Error("Connector did not respond before timeout."), { code: "CONNECTOR_CHECK_TIMEOUT" }));
-            if (!response?.success) return reject(Object.assign(new Error(response?.message || "Connector could not return company data."), { code: response?.code || "COMPANY_LIST_FAILED" }));
-            resolve(response);
-        });
+  if (!io || !clientId || !event)
+    return Promise.reject(
+      Object.assign(new Error("Connector is not available."), { code: "CONNECTOR_NOT_CONNECTED" }),
+    );
+  const socket = [...io.sockets.sockets.values()].find(
+    (candidate) =>
+      candidate.connected && candidate.data?.clientId === clientId && candidate.data?.connectorId,
+  );
+  if (!socket)
+    return Promise.reject(
+      Object.assign(new Error("Connector is not connected."), { code: "CONNECTOR_NOT_CONNECTED" }),
+    );
+  return new Promise((resolve, reject) => {
+    socket.timeout(timeoutMs).emit(event, payload, (error, response) => {
+      if (error)
+        return reject(
+          Object.assign(new Error("Connector did not respond before timeout."), {
+            code: "CONNECTOR_CHECK_TIMEOUT",
+          }),
+        );
+      if (!response?.success)
+        return reject(
+          Object.assign(
+            new Error(response?.message || "Connector could not return company data."),
+            { code: response?.code || "COMPANY_LIST_FAILED" },
+          ),
+        );
+      resolve(response);
     });
+  });
 }

@@ -1,7 +1,11 @@
 import { requireConnectedConnector } from "../../middlewares/connectedConnector.middleware.js";
 import express from "express";
 import { requireClientApiKey } from "../../middlewares/clientApiKey.middleware.js";
-import { getGroupSummary, getGroupSummaryPdf, getGroupSummaryStatus } from "./group-summary.controller.js";
+import {
+  getGroupSummary,
+  getGroupSummaryPdf,
+  getGroupSummaryStatus,
+} from "./group-summary.controller.js";
 
 const router = express.Router();
 router.post("/", requireClientApiKey, requireConnectedConnector, getGroupSummary);

@@ -3,7 +3,10 @@ import { getMongoCollection } from "../../config/mongo.database.js";
 
 const COLLECTION = "sales_order_requests";
 const configuredRetentionDays = Number.parseInt(process.env.REQUEST_RETENTION_DAYS || "90", 10);
-const RETENTION_DAYS = Number.isFinite(configuredRetentionDays) && configuredRetentionDays > 0 ? configuredRetentionDays : 90;
+const RETENTION_DAYS =
+  Number.isFinite(configuredRetentionDays) && configuredRetentionDays > 0
+    ? configuredRetentionDays
+    : 90;
 let indexesReady;
 
 async function getCollection() {
@@ -19,7 +22,10 @@ async function getCollection() {
         },
       ),
       // MongoDB's TTL monitor removes terminal jobs after their retention date.
-      collection.createIndex({ expires_at: 1 }, { expireAfterSeconds: 0, name: "ttl_terminal_requests" }),
+      collection.createIndex(
+        { expires_at: 1 },
+        { expireAfterSeconds: 0, name: "ttl_terminal_requests" },
+      ),
     ]).catch((error) => {
       indexesReady = undefined;
       throw error;
@@ -55,7 +61,10 @@ export async function createConnectorJob(input) {
     return { request, duplicate: false };
   } catch (error) {
     if (error.code !== 11000 || !input.idempotency_key) throw error;
-    const existing = await collection.findOne({ client_id: input.client_id, idempotency_key: input.idempotency_key });
+    const existing = await collection.findOne({
+      client_id: input.client_id,
+      idempotency_key: input.idempotency_key,
+    });
     if (!existing) throw error;
     return { request: existing, duplicate: true };
   }
@@ -63,7 +72,8 @@ export async function createConnectorJob(input) {
 
 export async function findQueuedConnectorJobs(clientId) {
   const collection = await getCollection();
-  return collection.find({ client_id: clientId, status: "queued" })
+  return collection
+    .find({ client_id: clientId, status: "queued" })
     .sort({ created_at: 1 })
     .project({ request_id: 1, transaction_type: 1 })
     .toArray();
@@ -85,18 +95,29 @@ export async function getConnectorJob(clientId, requestId) {
 
 export async function findSalesVouchersByNumber(clientId, company, voucherNumber, partyLedger) {
   const collection = await getCollection();
-  return collection.find({
-    client_id: clientId,
-    transaction_type: "sales_voucher",
-    ...(partyLedger ? { "sales_order.party_ledger_entry.ledger": partyLedger } : {}),
-    $and: [
-      { $or: [{ "destination.company": company }, { "destination.company_name": company }] },
-      { $or: [
-        { "tally_result.voucher_number_source": "tally", "tally_result.voucher_number": voucherNumber },
-        { "tally_result.voucher_number_source": { $ne: "tally" }, "sales_order.voucher_number": voucherNumber },
-      ] },
-    ],
-  }).limit(2).toArray();
+  return collection
+    .find({
+      client_id: clientId,
+      transaction_type: "sales_voucher",
+      ...(partyLedger ? { "sales_order.party_ledger_entry.ledger": partyLedger } : {}),
+      $and: [
+        { $or: [{ "destination.company": company }, { "destination.company_name": company }] },
+        {
+          $or: [
+            {
+              "tally_result.voucher_number_source": "tally",
+              "tally_result.voucher_number": voucherNumber,
+            },
+            {
+              "tally_result.voucher_number_source": { $ne: "tally" },
+              "sales_order.voucher_number": voucherNumber,
+            },
+          ],
+        },
+      ],
+    })
+    .limit(2)
+    .toArray();
 }
 
 export async function updateConnectorJob(clientId, requestId, update) {
@@ -117,4 +138,3 @@ export async function updateConnectorJob(clientId, requestId, update) {
   await collection.updateOne({ client_id: clientId, request_id: requestId }, updateOperation);
   return collection.findOne({ client_id: clientId, request_id: requestId });
 }
-

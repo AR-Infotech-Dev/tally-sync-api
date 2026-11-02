@@ -5,16 +5,26 @@ export const releaseArchitectures = ["x64", "ia32", "arm64"];
 const versionPattern = /^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$/;
 
 export function releaseError(status, message, data) {
-  return Object.assign(new Error(message), { status, apiCode: status === 401 ? 2005 : status === 404 ? 2004 : status === 400 ? 2001 : 2000, data });
+  return Object.assign(new Error(message), {
+    status,
+    apiCode: status === 401 ? 2005 : status === 404 ? 2004 : status === 400 ? 2001 : 2000,
+    data,
+  });
 }
 
 export const isReleaseVersion = (value) => typeof value === "string" && versionPattern.test(value);
-export const isReleaseArchitecture = (value) => typeof value === "string" && releaseArchitectures.includes(value);
+export const isReleaseArchitecture = (value) =>
+  typeof value === "string" && releaseArchitectures.includes(value);
 
 export function assertReleaseIdentity(version, architecture) {
   const errors = [];
-  if (!isReleaseVersion(version)) errors.push({ field: "version", message: "Use a stable version in X.Y.Z format, for example 0.0.1." });
-  if (!isReleaseArchitecture(architecture)) errors.push({ field: "architecture", message: "Architecture must be x64, ia32, or arm64." });
+  if (!isReleaseVersion(version))
+    errors.push({
+      field: "version",
+      message: "Use a stable version in X.Y.Z format, for example 0.0.1.",
+    });
+  if (!isReleaseArchitecture(architecture))
+    errors.push({ field: "architecture", message: "Architecture must be x64, ia32, or arm64." });
   if (errors.length) throw releaseError(400, "Invalid Connector release details.", { errors });
 }
 
@@ -42,7 +52,12 @@ export function publicRelease(metadata) {
 
 export function assertInside(parent, candidate) {
   const relative = path.relative(parent, candidate);
-  if (!relative || relative.startsWith(`..${path.sep}`) || relative === ".." || path.isAbsolute(relative)) {
+  if (
+    !relative ||
+    relative.startsWith(`..${path.sep}`) ||
+    relative === ".." ||
+    path.isAbsolute(relative)
+  ) {
     throw releaseError(500, "Invalid release storage path.");
   }
   return candidate;

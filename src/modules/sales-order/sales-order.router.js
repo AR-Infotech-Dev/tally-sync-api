@@ -2,7 +2,11 @@ import { requireConnectedConnector } from "../../middlewares/connectedConnector.
 import express from "express";
 import { requireClientApiKey } from "../../middlewares/clientApiKey.middleware.js";
 import { requireConnectorKey } from "../../middlewares/connectorApiKey.middleware.js";
-import { getSalesOrderRequest, pushSalesOrder, getSalesOrderFromTally } from "./sales-order.controller.js";
+import {
+  getSalesOrderRequest,
+  pushSalesOrder,
+  getSalesOrderFromTally,
+} from "./sales-order.controller.js";
 
 const router = express.Router();
 router.post("/push", requireClientApiKey, requireConnectedConnector, pushSalesOrder);

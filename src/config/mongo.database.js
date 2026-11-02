@@ -8,13 +8,18 @@ let connectionPromise;
 
 export async function getMongoDb() {
   if (!connectionPromise) {
-    connectionPromise = client.connect().then(() => client.db(mongoDbName)).catch((cause) => {
-      connectionPromise = undefined;
-      const error = new Error("MongoDB is unavailable. Check MONGODB_URI and confirm MongoDB is running.");
-      error.status = 503;
-      error.cause = cause;
-      throw error;
-    });
+    connectionPromise = client
+      .connect()
+      .then(() => client.db(mongoDbName))
+      .catch((cause) => {
+        connectionPromise = undefined;
+        const error = new Error(
+          "MongoDB is unavailable. Check MONGODB_URI and confirm MongoDB is running.",
+        );
+        error.status = 503;
+        error.cause = cause;
+        throw error;
+      });
   }
   return connectionPromise;
 }

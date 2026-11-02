@@ -25,10 +25,18 @@ export const loginToConsole = asyncHandler(async (req, res) => {
   }
 
   if (!verifyConsoleCredentials(req.body?.username, req.body?.password)) {
-    return failureResponse(res, { code: 2401, httpStatus: 401, message: "Username or password is incorrect." });
+    return failureResponse(res, {
+      code: 2401,
+      httpStatus: 401,
+      message: "Username or password is incorrect.",
+    });
   }
 
-  res.cookie(CONSOLE_COOKIE_NAME, createConsoleSession(process.env.CONSOLE_USERNAME), consoleSessionCookieOptions);
+  res.cookie(
+    CONSOLE_COOKIE_NAME,
+    createConsoleSession(process.env.CONSOLE_USERNAME),
+    consoleSessionCookieOptions,
+  );
   return successResponse(res, {
     code: 1400,
     message: "Admin Console login successful.",
@@ -40,16 +48,25 @@ export const logoutFromConsole = (_req, res) => {
   res.set("Cache-Control", "no-store");
   const { httpOnly, sameSite, secure, path } = consoleSessionCookieOptions;
   res.clearCookie(CONSOLE_COOKIE_NAME, { httpOnly, sameSite, secure, path });
-  return successResponse(res, { code: 1401, message: "Admin Console session ended.", data: { authenticated: false } });
+  return successResponse(res, {
+    code: 1401,
+    message: "Admin Console session ended.",
+    data: { authenticated: false },
+  });
 };
 
-export const getConsoleSession = (req, res) => successResponse(res, {
-  code: 1400,
-  message: "Admin Console session is active.",
-  data: { authenticated: true, username: req.consoleUser },
-});
+export const getConsoleSession = (req, res) =>
+  successResponse(res, {
+    code: 1400,
+    message: "Admin Console session is active.",
+    data: { authenticated: true, username: req.consoleUser },
+  });
 
 export const getConsoleDashboard = asyncHandler(async (_req, res) => {
   const snapshot = await getConsoleSnapshot();
-  return successResponse(res, { code: 1400, message: "Admin Console snapshot loaded.", data: snapshot });
+  return successResponse(res, {
+    code: 1400,
+    message: "Admin Console snapshot loaded.",
+    data: snapshot,
+  });
 });

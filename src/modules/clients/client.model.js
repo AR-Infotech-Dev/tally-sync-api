@@ -1,18 +1,18 @@
-import { getMongoCollection } from '../../config/mongo.database.js'
+import { getMongoCollection } from "../../config/mongo.database.js";
 
-const COLLECTION = 'clients'
-let clientIdIndexReady
-let licenseIndexReady
+const COLLECTION = "clients";
+let clientIdIndexReady;
+let licenseIndexReady;
 
-async function getClientCollection () {
-  const collection = await getMongoCollection(COLLECTION)
+async function getClientCollection() {
+  const collection = await getMongoCollection(COLLECTION);
   if (!clientIdIndexReady) {
     clientIdIndexReady = collection
-      .createIndex({ client_id: 1 }, { unique: true, name: 'uniq_client_id' })
-      .catch(error => {
-        clientIdIndexReady = undefined
-        throw error
-      })
+      .createIndex({ client_id: 1 }, { unique: true, name: "uniq_client_id" })
+      .catch((error) => {
+        clientIdIndexReady = undefined;
+        throw error;
+      });
   }
   if (!licenseIndexReady) {
     licenseIndexReady = collection
@@ -20,55 +20,55 @@ async function getClientCollection () {
         { tally_license_no: 1 },
         {
           unique: true,
-          name: 'uniq_tally_license_no',
-          partialFilterExpression: { tally_license_no: { $type: 'string' } }
-        }
+          name: "uniq_tally_license_no",
+          partialFilterExpression: { tally_license_no: { $type: "string" } },
+        },
       )
-      .catch(error => {
-        licenseIndexReady = undefined
-        throw error
-      })
+      .catch((error) => {
+        licenseIndexReady = undefined;
+        throw error;
+      });
   }
-  await Promise.all([clientIdIndexReady, licenseIndexReady])
-  return collection
+  await Promise.all([clientIdIndexReady, licenseIndexReady]);
+  return collection;
 }
 
-export async function findActiveClient (clientId) {
-  const collection = await getClientCollection()
-  return collection.findOne({ client_id: clientId, status: 'active' })
+export async function findActiveClient(clientId) {
+  const collection = await getClientCollection();
+  return collection.findOne({ client_id: clientId, status: "active" });
 }
 
-export async function createClient (client) {
-  const collection = await getClientCollection()
-  await collection.insertOne(client)
+export async function createClient(client) {
+  const collection = await getClientCollection();
+  await collection.insertOne(client);
 }
 
-export async function activateClient (clientId) {
-  const collection = await getClientCollection()
+export async function activateClient(clientId) {
+  const collection = await getClientCollection();
   const result = await collection.updateOne(
-    { client_id: clientId, status: 'pending_email' },
-    { $set: { status: 'active', updated_at: new Date() } }
-  )
-  return result.modifiedCount === 1
+    { client_id: clientId, status: "pending_email" },
+    { $set: { status: "active", updated_at: new Date() } },
+  );
+  return result.modifiedCount === 1;
 }
 
-export async function deleteClient (clientId) {
-  const collection = await getClientCollection()
-  await collection.deleteOne({ client_id: clientId, status: 'pending_email' })
+export async function deleteClient(clientId) {
+  const collection = await getClientCollection();
+  await collection.deleteOne({ client_id: clientId, status: "pending_email" });
 }
 
-export async function consumeActivation (hash) {
-  const collection = await getClientCollection()
+export async function consumeActivation(hash) {
+  const collection = await getClientCollection();
   return collection.findOneAndUpdate(
     {
       activation_hash: hash,
-      status: 'active',
-      activation_expires_at: { $gt: new Date() }
+      status: "active",
+      activation_expires_at: { $gt: new Date() },
     },
     {
-      $unset: { activation_hash: '', activation_expires_at: '' },
-      $set: { connector_activated_at: new Date() }
+      $unset: { activation_hash: "", activation_expires_at: "" },
+      $set: { connector_activated_at: new Date() },
     },
-    { returnDocument: 'before', projection: { client_id: 1, connector_id: 1 } }
-  )
+    { returnDocument: "before", projection: { client_id: 1, connector_id: 1 } },
+  );
 }

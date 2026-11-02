@@ -2,14 +2,16 @@ import { queueConnectorJob, readConnectorJob } from "../connector-jobs/connector
 
 function normalizeSalesVoucher(sales) {
   const items = sales.items || sales.line_items || sales.lineItems || [];
-  const partyLedger = sales.party_ledger
-    || sales.party_name
-    || sales.customer_ledger
-    || sales.customer_name
-    || sales.party?.ledger_name
-    || sales.party_ledger_entry?.ledger;
+  const partyLedger =
+    sales.party_ledger ||
+    sales.party_name ||
+    sales.customer_ledger ||
+    sales.customer_name ||
+    sales.party?.ledger_name ||
+    sales.party_ledger_entry?.ledger;
   const calculatedTotal = items.reduce((total, item) => {
-    const amount = item.amount ?? Number(item.quantity ?? item.qty) * Number(item.rate ?? item.unit_rate);
+    const amount =
+      item.amount ?? Number(item.quantity ?? item.qty) * Number(item.rate ?? item.unit_rate);
     return total + Number(amount);
   }, 0);
   const totalAmount = Number(sales.total_amount ?? calculatedTotal);
@@ -21,7 +23,10 @@ function normalizeSalesVoucher(sales) {
     voucher_mode: sales.voucher_mode || "Item Invoice",
     is_invoice: true,
     date: sales.date || sales.voucher_date,
-    items: items.map((item) => ({ ...item, sales_ledger: item.sales_ledger || sales.sales_ledger })),
+    items: items.map((item) => ({
+      ...item,
+      sales_ledger: item.sales_ledger || sales.sales_ledger,
+    })),
     party_ledger_entry: {
       ...existingPartyEntry,
       ledger: existingPartyEntry.ledger || partyLedger,

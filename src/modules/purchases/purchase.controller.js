@@ -6,10 +6,18 @@ const types = {
   purchase_voucher: { field: "purchase", label: "Purchase Voucher" },
   payment_voucher: { field: "payment", label: "Payment Voucher" },
 };
-const handlers = Object.fromEntries(Object.entries(types).map(([kind, config]) => [kind, createVoucherHandlers({
-  ...config, kind, includeFailureResult: true,
-  validate: (body) => validatePurchaseRequest(body, kind),
-  queue: (input) => queuePurchaseTransaction(input, kind), read: readPurchaseTransaction,
-})]));
+const handlers = Object.fromEntries(
+  Object.entries(types).map(([kind, config]) => [
+    kind,
+    createVoucherHandlers({
+      ...config,
+      kind,
+      includeFailureResult: true,
+      validate: (body) => validatePurchaseRequest(body, kind),
+      queue: (input) => queuePurchaseTransaction(input, kind),
+      read: readPurchaseTransaction,
+    }),
+  ]),
+);
 export const pushPurchase = (kind) => handlers[kind].push;
 export const getPurchaseRequest = (kind) => handlers[kind].getRequest;

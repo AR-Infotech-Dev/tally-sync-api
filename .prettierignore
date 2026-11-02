@@ -1,0 +1,15 @@
+node_modules/
+.git/
+.codex-tmp/
+.cache/
+storage/
+.env
+.env.*
+package-lock.json
+public/docs/site/
+**/*.text.hbs
+# Conditional attributes cannot be parsed by Prettier; keep this template formatted manually.
+src/templates/ledger-statement.hbs
+**/*.md
+**/*.zip
+**/*.pdf

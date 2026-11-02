@@ -1,6 +1,14 @@
 import { getMongoCollection } from "../../config/mongo.database.js";
 
-const SALES_ORDER_STATUSES = ["queued", "processing", "fetching", "building_xml", "pushing", "succeeded", "failed"];
+const SALES_ORDER_STATUSES = [
+  "queued",
+  "processing",
+  "fetching",
+  "building_xml",
+  "pushing",
+  "succeeded",
+  "failed",
+];
 
 export async function getConsoleDatabaseMetrics() {
   const clients = await getMongoCollection("clients");
@@ -24,24 +32,31 @@ export async function getConsoleDatabaseMetrics() {
 export async function listRecentConsoleSalesOrders(limit = 30) {
   const collection = await getMongoCollection("sales_order_requests");
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || 30));
-  return collection.find({}, {
-    projection: {
-      _id: 0,
-      request_id: 1,
-      client_id: 1,
-      status: 1,
-      transaction_type: 1,
-      attempt_count: 1,
-      created_at: 1,
-      updated_at: 1,
-      error: 1,
-      "destination.company": 1,
-      "destination.company_name": 1,
-      "sales_order.voucher_number": 1,
-      "sales.voucher_number": 1,
-      "purchase_order.voucher_number": 1,
-      "purchase.voucher_number": 1,
-      "payment.voucher_number": 1,
-    },
-  }).sort({ created_at: -1 }).limit(safeLimit).toArray();
+  return collection
+    .find(
+      {},
+      {
+        projection: {
+          _id: 0,
+          request_id: 1,
+          client_id: 1,
+          status: 1,
+          transaction_type: 1,
+          attempt_count: 1,
+          created_at: 1,
+          updated_at: 1,
+          error: 1,
+          "destination.company": 1,
+          "destination.company_name": 1,
+          "sales_order.voucher_number": 1,
+          "sales.voucher_number": 1,
+          "purchase_order.voucher_number": 1,
+          "purchase.voucher_number": 1,
+          "payment.voucher_number": 1,
+        },
+      },
+    )
+    .sort({ created_at: -1 })
+    .limit(safeLimit)
+    .toArray();
 }

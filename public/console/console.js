@@ -3,10 +3,19 @@ let refreshTimer;
 let latestSnapshot;
 let selectedLogLevel = "all";
 
-const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
-  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-}[character]));
- 
+const escapeHtml = (value) =>
+  String(value ?? "").replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[character],
+  );
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     credentials: "same-origin",
@@ -14,14 +23,23 @@ async function api(path, options = {}) {
     ...options,
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok || payload.success === false) throw new Error(payload.message || payload.msg || `Request failed (${response.status}).`);
+  if (!response.ok || payload.success === false)
+    throw new Error(payload.message || payload.msg || `Request failed (${response.status}).`);
   return payload;
 }
 
 function formatTime(value) {
   if (!value) return "—";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString([], { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return Number.isNaN(date.getTime())
+    ? "—"
+    : date.toLocaleString([], {
+        month: "short",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
 }
 
 function formatUptime(seconds = 0) {
@@ -50,14 +68,17 @@ function showLogin(message = "", isError = false) {
     </section>`;
 
   document.querySelector("#login-form").addEventListener("submit", login);
-  api("/api/console/auth/status").then(({ configured }) => {
-    if (!configured) {
-      const note = document.querySelector("#configuration-note");
-      note.hidden = false;
-      note.textContent = "Console login is not configured yet. Set CONSOLE_USERNAME and a CONSOLE_PASSWORD with at least 16 characters in the Server environment, then restart the Server.";
-      document.querySelector("#login-form button").disabled = true;
-    }
-  }).catch(() => {});
+  api("/api/console/auth/status")
+    .then(({ configured }) => {
+      if (!configured) {
+        const note = document.querySelector("#configuration-note");
+        note.hidden = false;
+        note.textContent =
+          "Console login is not configured yet. Set CONSOLE_USERNAME and a CONSOLE_PASSWORD with at least 16 characters in the Server environment, then restart the Server.";
+        document.querySelector("#login-form button").disabled = true;
+      }
+    })
+    .catch(() => {});
 }
 
 async function login(event) {
@@ -76,7 +97,11 @@ async function login(event) {
 }
 
 async function logout() {
-  try { await api("/api/console/auth/logout", { method: "POST", body: "{}" }); } catch { /* Session expiry still returns to login. */ }
+  try {
+    await api("/api/console/auth/logout", { method: "POST", body: "{}" });
+  } catch {
+    /* Session expiry still returns to login. */
+  }
   showLogin();
 }
 
@@ -85,9 +110,12 @@ async function loadSnapshot() {
     latestSnapshot = await api("/api/console/snapshot");
     renderDashboard(latestSnapshot);
     clearInterval(refreshTimer);
-    refreshTimer = setInterval(() => { if (!document.hidden) refreshSnapshot(); }, 15000);
+    refreshTimer = setInterval(() => {
+      if (!document.hidden) refreshSnapshot();
+    }, 15000);
   } catch (error) {
-    if (/login|required|expired|session/i.test(error.message)) showLogin("Your session ended. Sign in again.");
+    if (/login|required|expired|session/i.test(error.message))
+      showLogin("Your session ended. Sign in again.");
     else renderError(error.message);
   }
 }
@@ -97,7 +125,8 @@ async function refreshSnapshot() {
     latestSnapshot = await api("/api/console/snapshot");
     renderDashboard(latestSnapshot);
   } catch (error) {
-    if (/login|required|expired|session/i.test(error.message)) showLogin("Your session ended. Sign in again.");
+    if (/login|required|expired|session/i.test(error.message))
+      showLogin("Your session ended. Sign in again.");
     else document.querySelector("#refresh-error").textContent = error.message;
   }
 }
@@ -156,28 +185,47 @@ function queueCard(label, count, tone) {
 }
 
 function renderConnectorTable(connectors) {
-  if (!connectors.length) return `<div class="empty">No authenticated Connector sockets are online.</div>`;
+  if (!connectors.length)
+    return `<div class="empty">No authenticated Connector sockets are online.</div>`;
   return `<div class="table-wrap"><table><thead><tr><th>Client ID</th><th>Connector ID</th><th>Socket ID</th><th>Last heartbeat</th></tr></thead><tbody>${connectors.map((connector) => `<tr><td class="mono truncate" title="${escapeHtml(connector.clientId)}">${escapeHtml(connector.clientId)}</td><td class="mono truncate" title="${escapeHtml(connector.connectorId)}">${escapeHtml(connector.connectorId)}</td><td class="mono truncate" title="${escapeHtml(connector.socketId)}">${escapeHtml(connector.socketId)}</td><td class="truncate">${escapeHtml(formatTime(connector.lastSeenAt))}</td></tr>`).join("")}</tbody></table></div>`;
 }
 
 function renderJobsTable(jobs) {
   if (!jobs.length) return `<div class="empty">No transaction jobs have been stored yet.</div>`;
-  return `<div class="table-wrap"><table><thead><tr><th>Created</th><th>Transaction</th><th>Request</th><th>Status</th><th>Try</th><th>Error</th></tr></thead><tbody>${jobs.map((job) => {
-    const transactionName = ({ sales_order: "Sales Order", sales_voucher: "Sales", receipt_voucher: "Receipt", purchase_order: "Purchase Order", purchase_voucher: "Purchase", payment_voucher: "Payment" })[job.transaction_type] || "Transaction";
-    const voucherData = job.sales?.voucher_number ? job.sales : job.sales_order || job.purchase_order || job.purchase || job.payment || {};
-    const voucherNumber = voucherData.voucher_number ? ` · ${voucherData.voucher_number}` : "";
-    const company = job.destination?.company || job.destination?.company_name || "";
-    return `<tr><td class="truncate">${escapeHtml(formatTime(job.created_at))}</td><td>${escapeHtml(transactionName)}</td><td class="mono truncate" title="${escapeHtml(job.request_id)}">${escapeHtml(job.request_id)}${escapeHtml(voucherNumber)}</td><td><span class="status-tag ${escapeHtml(job.status)}">${escapeHtml(job.status)}</span></td><td>${Number(job.attempt_count) || 0}</td><td class="truncate" title="${escapeHtml(job.error || company)}">${escapeHtml(job.error || company || "—")}</td></tr>`;
-  }).join("")}</tbody></table></div>`;
+  return `<div class="table-wrap"><table><thead><tr><th>Created</th><th>Transaction</th><th>Request</th><th>Status</th><th>Try</th><th>Error</th></tr></thead><tbody>${jobs
+    .map((job) => {
+      const transactionName =
+        {
+          sales_order: "Sales Order",
+          sales_voucher: "Sales",
+          receipt_voucher: "Receipt",
+          purchase_order: "Purchase Order",
+          purchase_voucher: "Purchase",
+          payment_voucher: "Payment",
+        }[job.transaction_type] || "Transaction";
+      const voucherData = job.sales?.voucher_number
+        ? job.sales
+        : job.sales_order || job.purchase_order || job.purchase || job.payment || {};
+      const voucherNumber = voucherData.voucher_number ? ` · ${voucherData.voucher_number}` : "";
+      const company = job.destination?.company || job.destination?.company_name || "";
+      return `<tr><td class="truncate">${escapeHtml(formatTime(job.created_at))}</td><td>${escapeHtml(transactionName)}</td><td class="mono truncate" title="${escapeHtml(job.request_id)}">${escapeHtml(job.request_id)}${escapeHtml(voucherNumber)}</td><td><span class="status-tag ${escapeHtml(job.status)}">${escapeHtml(job.status)}</span></td><td>${Number(job.attempt_count) || 0}</td><td class="truncate" title="${escapeHtml(job.error || company)}">${escapeHtml(job.error || company || "—")}</td></tr>`;
+    })
+    .join("")}</tbody></table></div>`;
 }
 
 function renderLogs(logs = []) {
-  const filtered = selectedLogLevel === "all" ? logs : logs.filter((entry) => entry.level === selectedLogLevel);
+  const filtered =
+    selectedLogLevel === "all" ? logs : logs.filter((entry) => entry.level === selectedLogLevel);
   if (!filtered.length) return `<div class="empty">No activity for this filter.</div>`;
-  return filtered.map((entry) => {
-    const details = Object.entries(entry).filter(([key]) => !["id", "at", "level", "message", "source"].includes(key)).map(([key, value]) => `${key}=${value}`).join(" · ");
-    return `<div class="log-row"><time class="log-time">${escapeHtml(formatTime(entry.at))}</time><span class="log-level ${escapeHtml(entry.level)}">${escapeHtml(entry.level)}</span><span class="log-message">${escapeHtml(entry.message)}</span>${details ? `<span class="log-context">${escapeHtml(details)}</span>` : ""}</div>`;
-  }).join("");
+  return filtered
+    .map((entry) => {
+      const details = Object.entries(entry)
+        .filter(([key]) => !["id", "at", "level", "message", "source"].includes(key))
+        .map(([key, value]) => `${key}=${value}`)
+        .join(" · ");
+      return `<div class="log-row"><time class="log-time">${escapeHtml(formatTime(entry.at))}</time><span class="log-level ${escapeHtml(entry.level)}">${escapeHtml(entry.level)}</span><span class="log-message">${escapeHtml(entry.message)}</span>${details ? `<span class="log-context">${escapeHtml(details)}</span>` : ""}</div>`;
+    })
+    .join("");
 }
 
 async function start() {

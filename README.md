@@ -1,5 +1,9 @@
 # Tally Sync API
 
+## Code formatting
+
+Run `npm run format` to format source files and `npm run format:check` to check the style. Prettier is pinned as a development dependency and uses `.prettierrc.json`: two spaces, double quotes, semicolons and a 100-character line width. HTML templates preserve whitespace sensitivity, and embedded code strings are kept intact. Secrets, generated documentation, binary artifacts and plain-text email content are excluded in `.prettierignore`. The Ledger Statement template uses conditional Handlebars attributes unsupported by Prettier; it is formatted manually while preserving its rendered output.
+
 ## Ledger statements
 
 ### PDF preview/download
