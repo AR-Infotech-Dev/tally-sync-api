@@ -19,6 +19,7 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "test": "node --test",
+    "check:imports": "node --input-type=module -e \"await import('./src/app.js')\"",
     "start": "node src/server.js",
     "routes": "node src/scripts/printRoutes.js",
     "client:create": "node src/scripts/createClient.js"
