@@ -2449,13 +2449,26 @@ components:
     Item:
       type: object
       required:
-        - stock_item
         - quantity
         - rate
+      anyOf:
+        - required: [item_code]
+        - required: [stock_item]
       properties:
+        item_code:
+          type: string
+          minLength: 1
+          maxLength: 500
+          example: '00123'
+          description: >-
+            Tally Stock Item Part No. (MAILINGNAME). Takes priority over stock_item.
+            Resolved within destination.company_id from the Connector stock master cache.
+            A missing code returns 404; a code shared by multiple items returns 409.
+            Complete a company sync after updating Part No. Values must be strings to preserve leading zeros.
         stock_item:
           type: string
           example: Demo Item
+          description: Used when item_code is not supplied. A supplied invalid code never falls back to this name.
         quantity:
           type: number
           minimum: 0

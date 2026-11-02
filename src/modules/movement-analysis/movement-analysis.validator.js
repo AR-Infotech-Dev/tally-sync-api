@@ -1,8 +1,10 @@
 import { normalizeMovementOptions } from "./movement-analysis.options.js";
+import { validateItemIdentity } from "../../shared/utils/itemIdentity.js";
 export function validateMovementAnalysis(body) {
   if (!body || typeof body !== "object" || Array.isArray(body)) return [{ field: "body", message: "A JSON object is required." }];
   const errors = [];
-  for (const field of ["company_id", "stock_item"]) if (typeof body[field] !== "string" || !body[field].trim() || body[field].length > 500 || /[\x00-\x1f]/.test(body[field])) errors.push({ field, message: `${field} must be a non-empty string.` });
+  for (const field of ["company_id"]) if (typeof body[field] !== "string" || !body[field].trim() || body[field].length > 500 || /[\x00-\x1f]/.test(body[field])) errors.push({ field, message: `${field} must be a non-empty string.` });
+  errors.push(...validateItemIdentity(body, "item").map((error) => ({ ...error, field: error.field.replace(/^item\./, "") })));
   for (const field of ["from_date", "to_date"]) {
     const value = body[field];
     const valid = typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;

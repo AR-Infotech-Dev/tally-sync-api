@@ -1,4 +1,5 @@
 import {validateOrderDueDates} from '../../shared/utils/orderDueDate.js';
+import { validateItemIdentity } from "../../shared/utils/itemIdentity.js";
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
 function validDate(value) {
@@ -37,7 +38,8 @@ export function validatePurchaseRequest(body = {}, kind) {
     const items = voucher.items || voucher.line_items || voucher.lineItems;
     if (!Array.isArray(items) || items.length === 0) errors.push({ field: `${config.field}.items`, message: `${config.label} must contain at least one item.` });
     else items.forEach((item, index) => {
-      if (!isObject(item) || !(item.stock_item || item.item_name || item.name)) errors.push({ field: `${config.field}.items[${index}].stock_item`, message: "Stock item name is required." });
+      errors.push(...validateItemIdentity(item, `${config.field}.items[${index}]`));
+      if (!isObject(item)) return;
       if (!Number.isFinite(Number(item.quantity ?? item.qty)) || Number(item.quantity ?? item.qty) <= 0) errors.push({ field: `${config.field}.items[${index}].quantity`, message: "Quantity must be greater than zero." });
       if (!Number.isFinite(Number(item.rate ?? item.unit_rate)) || Number(item.rate ?? item.unit_rate) < 0) errors.push({ field: `${config.field}.items[${index}].rate`, message: "A valid item rate is required." });
     });

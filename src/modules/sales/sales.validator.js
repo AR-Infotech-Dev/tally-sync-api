@@ -1,3 +1,4 @@
+import { validateItemIdentity } from "../../shared/utils/itemIdentity.js";
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
 export function validateSalesPdfLookup(query = {}) {
@@ -91,9 +92,7 @@ export function validateSalesVoucherRequest(input = {}) {
         errors.push({ field, message: "Each item must be a JSON object." });
         return;
       }
-      if (!(item.stock_item || item.item_name || item.name)) {
-        errors.push({ field: `${field}.item_name`, message: "Stock item name is required." });
-      }
+      errors.push(...validateItemIdentity(item, field));
       if (!(item.sales_ledger || sales.sales_ledger)) {
         errors.push({ field: `${field}.sales_ledger`, message: "Sales ledger is required on the item or sales voucher." });
       }

@@ -1,4 +1,5 @@
 import {validateOrderDueDates} from '../../shared/utils/orderDueDate.js';
+import { validateItemIdentity } from "../../shared/utils/itemIdentity.js";
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
 export function validateSalesOrderRequest(body = {}) {
@@ -12,6 +13,10 @@ export function validateSalesOrderRequest(body = {}) {
   if (body.idempotency_key !== undefined && (typeof body.idempotency_key !== "string" || body.idempotency_key.length > 200)) {
     errors.push({ field: "idempotency_key", message: "idempotency_key must be a string of at most 200 characters." });
   }
-  if(isObject(body.sales_order)) errors.push(...validateOrderDueDates(body.sales_order,'sales_order'));
+  if(isObject(body.sales_order)) {
+    errors.push(...validateOrderDueDates(body.sales_order,'sales_order'));
+    const items = body.sales_order.items || body.sales_order.line_items || body.sales_order.lineItems || body.sales_order.header?.items;
+    if (Array.isArray(items)) items.forEach((item, index) => errors.push(...validateItemIdentity(item, `sales_order.items[${index}]`)));
+  }
   return errors;
 }
