@@ -2,6 +2,7 @@ import { emitToConnector } from "../../socket/index.js";
 import { createConnectorJob, getConnectorJob } from "./connector-job.model.js";
 import { connectorJobSignal, getConnectorJobType } from "./connector-job.registry.js";
 import { recordConsoleLog } from "../console/consoleLog.store.js";
+import { resolveRequestCompany } from "../companies/company.service.js";
 import {
   assertConnectorAvailable,
   assertConnectorConnected,
@@ -11,8 +12,14 @@ import {
 export async function queueConnectorJob(input) {
   const type = input.transaction_type || "sales_order";
   const config = getConnectorJobType(type);
+  const company = await resolveRequestCompany(input.client_id, input.destination || input.lookup);
   await assertConnectorAvailable(input.client_id, { requireTally: config.requireTally });
-  const result = await createConnectorJob({ ...input, transaction_type: type });
+  const result = await createConnectorJob({
+    ...input,
+    destination: { ...input.destination, ...company },
+    ...(input.lookup ? { lookup: { ...input.lookup, ...company } } : {}),
+    transaction_type: type,
+  });
   let connectorNotified = false;
   if (result.request.status === "queued") {
     const signal = connectorJobSignal(result.request);

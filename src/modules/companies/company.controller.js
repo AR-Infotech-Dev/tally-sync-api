@@ -6,8 +6,18 @@ export const getCompanies = asyncHandler(async (req, res) => {
   try {
     const companies = await listCompanies(req.client.client_id);
     return successResponse(res, {
-      message: "Companies retrieved from the Connector cache.",
-      data: { companies },
+      message: "Client companies retrieved.",
+      data: {
+        companies: companies.map(
+          ({ company_id, company_name, status, last_synced_at, sync_status }) => ({
+            company_id,
+            company_name,
+            status,
+            last_synced_at: last_synced_at || null,
+            sync_status,
+          }),
+        ),
+      },
     });
   } catch (error) {
     const code =
@@ -23,9 +33,10 @@ export const getCompanies = asyncHandler(async (req, res) => {
           ? 504
           : 503;
     return failureResponse(res, {
-      code,
-      httpStatus: status,
+      code: error.apiCode || code,
+      httpStatus: error.httpStatus || status,
       message: error.message,
+      data: error.data,
     });
   }
 });

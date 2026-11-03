@@ -1,7 +1,7 @@
 import { isVoucherDate } from "./dateValidation.js";
 export function validateVoucherLookup(query = {}) {
   const lookup = {
-    company: query.company,
+    companyId: query.company_id,
     ledgerName: query.ledger_name ?? query.party_ledger,
     voucherNumber: query.voucher_no ?? query.voucher_number,
     voucherDate: query.voucher_date,
@@ -15,7 +15,16 @@ export function validateVoucherLookup(query = {}) {
       value.length > 500 ||
       /[\x00-\x1f]/.test(value)
     ) {
-      errors.push({ field, message: `${field} must be a non-empty string up to 500 characters.` });
+      const apiField = {
+        companyId: "company_id",
+        ledgerName: "ledger_name",
+        voucherNumber: "voucher_no",
+        voucherDate: "voucher_date",
+      }[field];
+      errors.push({
+        field: apiField,
+        message: `${apiField} must be a non-empty string up to 500 characters.`,
+      });
     } else lookup[field] = value.trim();
   }
   if (

@@ -13,15 +13,15 @@ export const createVoucherLookupHandler = (transactionType, label) =>
       return failureResponse(res, {
         code: 2001,
         httpStatus: 400,
-        message: "company, ledger_name and voucher_no are required; voucher_date is optional.",
+        message: "company_id, ledger_name and voucher_no are required; voucher_date is optional.",
         data: { errors },
       });
     const result = await queueConnectorJob({
       client_id: req.client.client_id,
       transaction_type: transactionType,
-      destination: { company: lookup.company },
+      destination: { company_id: lookup.companyId },
       lookup: {
-        company: lookup.company,
+        company_id: lookup.companyId,
         ledger_name: lookup.ledgerName,
         voucher_no: lookup.voucherNumber,
         ...(lookup.voucherDate ? { voucher_date: lookup.voucherDate } : {}),

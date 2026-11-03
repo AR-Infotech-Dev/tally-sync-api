@@ -5,10 +5,12 @@ import { readSalesVoucher } from "./sales.service.js";
 import { recordConsoleLog } from "../console/consoleLog.store.js";
 import { createHash } from "node:crypto";
 import { assertConnectorAvailable } from "../connectors/connectorAvailability.service.js";
+import { resolveRequestCompany } from "../companies/company.service.js";
 
-export async function requestSalesVoucherPdfByNumber(clientId, company, voucherNumber, options) {
+export async function requestSalesVoucherPdfByNumber(clientId, companyId, voucherNumber, options) {
+  const target = await resolveRequestCompany(clientId, { company_id: companyId });
   const lookup = {
-    company,
+    ...target,
     ledger_name: options.partyLedger,
     voucher_no: voucherNumber,
     ...(options.voucherDate ? { voucher_date: options.voucherDate } : {}),
@@ -39,6 +41,7 @@ export async function requestSalesVoucherPdf(clientId, requestId, { retry = fals
   if (existing?.status === "ready") return { pdf: existing };
   if (existing?.status === "failed" && !retry) return { job: existing, connectorNotified: false };
 
+  await resolveRequestCompany(clientId, request.destination);
   await assertConnectorAvailable(clientId);
   const job = await queueSalesPdf(clientId, requestId);
   const connectorNotified =

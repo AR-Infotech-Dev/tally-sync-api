@@ -366,11 +366,12 @@
           </div>
           <div class="field-list">
             <div class="field"
-              ><code class="field-name">Company selection</code>
+              ><code class="field-name">Company routing</code>
               <div class="field-description"
-                >For imports, the company configured in the Connector takes precedence over
-                <code>destination.company</code>. Direct lookups and ledger statements honor an
-                explicit company.
+                >Use the client company ID (for example, <code>01</code>) from <code>/companies</code> as
+                <code>destination.company_id</code> for pushes and <code>company_id</code> for
+                reports and lookups. Each request validates an open company belonging to the
+                authenticated client. Connector has no selected-company fallback.
               </div>
             </div>
             <div class="field"

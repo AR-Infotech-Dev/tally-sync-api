@@ -13,6 +13,8 @@ import {
 import { findActiveClient } from "../clients/client.model.js";
 import { recordConsoleLog } from "../console/consoleLog.store.js";
 import { dispatchPendingSalesVoucherPdfs } from "../sales/sales-pdf.service.js";
+import { normalizeCompanies } from "../companies/company.identity.js";
+import { saveClientCompanies, readClientCompanies } from "../companies/company.model.js";
 
 async function emitPendingConnectorJobs(clientId, socket) {
   const requests = await findQueuedConnectorJobs(clientId);
@@ -33,6 +35,23 @@ async function emitPendingConnectorJobs(clientId, socket) {
 const isValidId = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
 
 export function registerConnectorSocketHandlers(socket) {
+  socket.on("company:snapshot", async (payload = {}, acknowledge = () => {}) => {
+    try {
+      if (!socket.data.clientId || !socket.data.connectorId)
+        throw new Error("Connector authentication is required.");
+      await saveClientCompanies(
+        socket.data.clientId,
+        normalizeCompanies(socket.data.clientId, payload.companies),
+      );
+      const companies = await readClientCompanies(socket.data.clientId);
+      acknowledge({
+        success: true,
+        companies: companies.map(({ company_id, tally_guid }) => ({ company_id, tally_guid })),
+      });
+    } catch (error) {
+      acknowledge({ success: false, message: error.message });
+    }
+  });
   socket.on(SOCKET_EVENTS.connectorRegister, async (payload = {}, acknowledge = () => {}) => {
     const ack = typeof acknowledge === "function" ? acknowledge : () => {};
     const clientId = String(payload.client_id || "");
@@ -107,6 +126,23 @@ export function registerConnectorSocketHandlers(socket) {
       return;
     }
 
+    if (
+      [...socket.nsp.sockets.values()].some(
+        (other) =>
+          other.id !== socket.id &&
+          other.connected &&
+          other.data.clientId === clientId &&
+          other.data.connectorId,
+      )
+    ) {
+      ack({
+        success: false,
+        code: "CONNECTOR_ALREADY_CONNECTED",
+        message:
+          "Another Connector is already connected for this client. Disconnect it before connecting this installation.",
+      });
+      return;
+    }
     if (socket.data.clientId) socket.leave(connectorRoom(socket.data.clientId));
     socket.data.clientId = clientId;
     socket.data.connectorId = connectorId;

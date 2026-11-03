@@ -43,12 +43,12 @@ export const requestSalesVoucherPdfDownloadByNumber = asyncHandler(async (req, r
     return failureResponse(res, {
       code: 2001,
       httpStatus: 400,
-      message: "company, ledger_name and voucher_no are required; voucher_date is optional.",
+      message: "company_id, ledger_name and voucher_no are required; voucher_date is optional.",
       data: { errors },
     });
   const result = await requestSalesVoucherPdfByNumber(
     req.client.client_id,
-    lookup.company,
+    lookup.companyId,
     lookup.voucherNumber,
     {
       retry: req.query.retry === "true",
