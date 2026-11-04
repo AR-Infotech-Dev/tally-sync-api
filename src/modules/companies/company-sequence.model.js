@@ -1,4 +1,5 @@
 import { getMongoCollection } from "../../config/mongo.database.js";
+import { companyIdentity } from "./company-key.js";
 
 export const isCompanySequence = (value) =>
   typeof value === "string" && /^(?:0[1-9]|[1-9]\d+)$/.test(value);
@@ -44,10 +45,41 @@ export async function ensureCompanySequence(
   clientId,
   company,
   reserve = nextCompanySequence,
+  allowLegacyAdoption = true,
 ) {
-  const filter = { client_id: clientId, tally_guid: company.tally_guid };
-  const existing = await rows.findOne(filter);
-  if (isCompanySequence(existing?.company_id)) return existing;
+  company = { ...company, ...companyIdentity(company) };
+  const filter = { client_id: clientId, company_key: company.company_key };
+  let existing = await rows.findOne(filter);
+  if (!existing && allowLegacyAdoption) {
+    const legacy = await rows.findOne({
+      client_id: clientId,
+      tally_guid: company.tally_guid,
+      company_name: company.company_name,
+    });
+    if (
+      legacy &&
+      (!legacy.company_key ||
+        (legacy.identity_basis === "name" && company.identity_basis === "locator"))
+    ) {
+      await rows.updateOne(
+        { client_id: clientId, company_id: legacy.company_id, company_key: legacy.company_key },
+        { $set: company },
+      );
+      existing = await rows.findOne(filter);
+    } else if (legacy?.identity_basis === "locator" && company.identity_basis === "name") {
+      throw new Error(
+        "Company locator metadata is missing. Update Connector before rediscovering this company.",
+      );
+    }
+  }
+  if (isCompanySequence(existing?.company_id)) {
+    if (!existing.company_sequence)
+      await rows.updateOne(filter, { $set: { company_sequence: Number(existing.company_id) } });
+    return {
+      ...existing,
+      company_sequence: existing.company_sequence || Number(existing.company_id),
+    };
+  }
   const sequence = await reserve(clientId);
   if (existing) {
     await rows.updateOne({ ...filter, company_id: existing.company_id }, { $set: sequence });

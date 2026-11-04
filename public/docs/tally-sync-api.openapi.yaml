@@ -105,7 +105,7 @@ paths:
           clientApiKey: []
       description: >-
         Returns this client's persistent company registry, refreshed from open Tally companies.
-        company_id is a persistent per-client sequence such as "01", "02". Tally GUID is used only internally. Previously discovered closed companies remain listed.
+        company_id is a persistent per-client sequence such as "01", "02". Tally identity metadata is used only internally; restored branches sharing a GUID receive separate IDs when their company identities differ. Previously discovered closed companies remain listed.
         active means currently open; closed means absent from live discovery; unknown means availability
         could not be checked. Never-discovered closed folders are not inferred. All business requests
         require company_id and a live open-company check before party/item lookup or execution.

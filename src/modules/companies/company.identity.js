@@ -1,4 +1,5 @@
 import { isCompanySequence } from "./company-sequence.model.js";
+import { companyIdentity } from "./company-key.js";
 
 export const companyError = (code, message, status = 409) =>
   Object.assign(new Error(message), {
@@ -22,15 +23,23 @@ export function normalizeCompanies(clientId, rows) {
         "COMPANY_DISCOVERY_INVALID",
         "Update Connector: every company must include its Tally GUID and name.",
       );
+    const identity = companyIdentity({ ...row, tally_guid: guid });
+    if (row.company_key && row.company_key !== identity.company_key)
+      throw companyError(
+        "COMPANY_DISCOVERY_INVALID",
+        "Connector company identity does not match its company metadata. Update Connector and retry.",
+      );
     return {
-      tally_guid: guid,
-      company_name: row.company_name.trim(),
+      ...identity,
       last_synced_at: row.last_synced_at || null,
       sync_status: row.sync_status || "not_synced",
     };
   });
-  if (new Set(companies.map((row) => row.tally_guid)).size !== companies.length)
-    throw companyError("COMPANY_DISCOVERY_INVALID", "Connector returned duplicate company GUIDs.");
+  if (new Set(companies.map((row) => row.company_key)).size !== companies.length)
+    throw companyError(
+      "COMPANY_DISCOVERY_INVALID",
+      "Connector returned duplicate company identities. Distinct data folders or explicit relinking are required.",
+    );
   return companies;
 }
 export function selectCompany(rows, reference = {}) {
@@ -57,7 +66,8 @@ export function selectCompany(rows, reference = {}) {
     );
   return {
     company_id: company.company_id,
-    company_guid: company.tally_guid,
+    company_guid: company.company_key,
+    tally_guid: company.tally_guid,
     company: company.company_name,
   };
 }

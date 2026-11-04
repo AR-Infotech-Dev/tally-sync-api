@@ -15,7 +15,11 @@ export function memoryCompanyRepository() {
     },
   };
   const reserve = async (client) => {
-    const value = (counters.get(client) || 0) + 1;
+    const highest = Math.max(
+      0,
+      ...data.filter((row) => row.client_id === client).map((row) => Number(row.company_id) || 0),
+    );
+    const value = Math.max(counters.get(client) || 0, highest) + 1;
     counters.set(client, value);
     return { company_id: formatCompanySequence(value), company_sequence: value };
   };

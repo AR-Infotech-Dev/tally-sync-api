@@ -2,12 +2,31 @@ import { getMongoCollection } from "../../config/mongo.database.js";
 import { ensureCompanySequence, isCompanySequence } from "./company-sequence.model.js";
 
 let indexes;
+export async function ensureCompanyIndexes(rows) {
+  await rows.createIndex({ client_id: 1, company_id: 1 }, { unique: true });
+  await rows.createIndex(
+    { client_id: 1, company_key: 1 },
+    { unique: true, partialFilterExpression: { company_key: { $type: "string" } } },
+  );
+  // GUIDs may be shared by restored branch companies. Keep IDs, replace only the obsolete index.
+  const existing = await rows.listIndexes().toArray();
+  for (const index of existing)
+    if (
+      index.unique &&
+      Object.keys(index.key).length === 2 &&
+      index.key.client_id === 1 &&
+      index.key.tally_guid === 1
+    ) {
+      try {
+        await rows.dropIndex(index.name);
+      } catch (error) {
+        if (error.code !== 27) throw error;
+      }
+    }
+}
 async function collection() {
   const rows = await getMongoCollection("client_companies");
-  indexes ||= Promise.all([
-    rows.createIndex({ client_id: 1, company_id: 1 }, { unique: true }),
-    rows.createIndex({ client_id: 1, tally_guid: 1 }, { unique: true }),
-  ]).catch((error) => {
+  indexes ||= ensureCompanyIndexes(rows).catch((error) => {
     indexes = null;
     throw error;
   });
@@ -18,12 +37,18 @@ export async function saveClientCompanies(clientId, companies) {
   const rows = await collection();
   await migrateCompanyIds(rows, clientId);
   const now = new Date().toISOString();
-  for (const company of companies) await ensureCompanySequence(rows, clientId, company);
+  for (const company of companies) {
+    const unambiguous =
+      companies.filter(
+        (row) => row.tally_guid === company.tally_guid && row.company_name === company.company_name,
+      ).length === 1;
+    await ensureCompanySequence(rows, clientId, company, undefined, unambiguous);
+  }
   if (companies.length)
     await rows.bulkWrite(
       companies.map((company) => ({
         updateOne: {
-          filter: { client_id: clientId, tally_guid: company.tally_guid },
+          filter: { client_id: clientId, company_key: company.company_key },
           update: {
             $set: {
               ...Object.fromEntries(
@@ -55,7 +80,7 @@ async function migrateCompanyIds(rows, clientId) {
     .sort({ first_seen_at: 1, company_id: 1 })
     .toArray();
   for (const company of known) {
-    if (!isCompanySequence(company.company_id))
+    if (!company.company_key || !isCompanySequence(company.company_id))
       await ensureCompanySequence(rows, clientId, company);
   }
 }

@@ -46,7 +46,11 @@ export function registerConnectorSocketHandlers(socket) {
       const companies = await readClientCompanies(socket.data.clientId);
       acknowledge({
         success: true,
-        companies: companies.map(({ company_id, tally_guid }) => ({ company_id, tally_guid })),
+        companies: companies.map(({ company_id, tally_guid, company_key }) => ({
+          company_id,
+          tally_guid,
+          company_key,
+        })),
       });
     } catch (error) {
       acknowledge({ success: false, message: error.message });

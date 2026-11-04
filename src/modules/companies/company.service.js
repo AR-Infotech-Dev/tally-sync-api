@@ -38,11 +38,11 @@ export function createCompanyRegistry({
       }
     }
     const known = await read(clientId);
-    const live = new Map(open?.map((row) => [row.tally_guid, row]));
+    const live = new Map(open?.map((row) => [row.company_key, row]));
     return known.map((row) => ({
       ...row,
-      ...(live.get(row.tally_guid) || {}),
-      status: open ? (live.has(row.tally_guid) ? "active" : "closed") : "unknown",
+      ...(live.get(row.company_key) || {}),
+      status: open ? (live.has(row.company_key) ? "active" : "closed") : "unknown",
     }));
   }
   return {
