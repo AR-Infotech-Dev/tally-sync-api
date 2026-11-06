@@ -10,9 +10,9 @@ const handlers = createReportHandlers({
   resultKey: "movement_analysis",
   generatePdf: generateMovementAnalysisPdf,
   filename: (report) =>
-    `movement-analysis-${report.stock_item.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80)}-${report.from_date}-${report.to_date}.pdf`,
+    `movement-analysis-${(report.analysis_label || report.stock_item || "report").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80)}-${report.from_date}-${report.to_date}.pdf`,
   messages: {
-    validation: "Invalid Stock Item Movement Analysis request.",
+    validation: "Invalid Movement Analysis request.",
     timeout: "Connector did not return Movement Analysis before timeout.",
     failure: "Movement Analysis failed.",
     missingResult: "Connector returned no Movement Analysis report.",

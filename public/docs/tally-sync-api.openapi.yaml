@@ -16,6 +16,7 @@ servers:
   - url: https://sync.flowups.in
     description: Production Server
 tags:
+  - name: Movement Analysis
   - name: Health
   - name: Client Registration
   - name: Sales Orders
@@ -29,6 +30,99 @@ tags:
   - name: Admin Console
     description: Administrative session endpoints, separate from CRM API keys.
 paths:
+  /api/v1/movement-analysis/pdf:
+    post:
+      tags:
+        - Movement Analysis
+      summary: Movement Analysis PDF — six analysis types
+      description: >-
+        Requires an online Connector (0.1.20 or newer) and an open company. analysis_type defaults to
+        stock-item for existing callers. Choose exactly the selector fields for that type; unrelated
+        selectors are rejected. Dealer Code and Item Code have priority over names. Stock/accounting
+        groups include descendant groups. Stock-item rows show parties; other analyses show stock
+        items grouped into inward/outward sections. The existing display flags apply to all types.
+        Transfers use a Stock Journal voucher type. Data is read live in bounded chunks; failures
+        return JSON errors and never a partial PDF.
+      security:
+        - clientId: []
+          clientApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovementAnalysisRequest'
+            examples:
+              stock-item:
+                summary: stock-item movement PDF
+                value:
+                  company_id: '02'
+                  analysis_type: stock-item
+                  stock_item: ALGAS 500ML - 24NOS
+                  from_date: '2026-04-01'
+                  to_date: '2026-10-31'
+                  movement_type: all
+              stock-group:
+                summary: stock-group movement PDF
+                value:
+                  company_id: '02'
+                  analysis_type: stock-group
+                  stock_group: Finished Goods
+                  from_date: '2026-04-01'
+                  to_date: '2026-10-31'
+                  movement_type: all
+              stock-category:
+                summary: stock-category movement PDF
+                value:
+                  company_id: '02'
+                  analysis_type: stock-category
+                  stock_category: Agricultural Products
+                  from_date: '2026-04-01'
+                  to_date: '2026-10-31'
+                  movement_type: all
+              group:
+                summary: group movement PDF
+                value:
+                  company_id: '02'
+                  analysis_type: group
+                  group: Sundry Debtors
+                  from_date: '2026-04-01'
+                  to_date: '2026-10-31'
+                  movement_type: all
+              ledger:
+                summary: ledger movement PDF
+                value:
+                  company_id: '02'
+                  analysis_type: ledger
+                  dealer_code: MH0001
+                  from_date: '2026-04-01'
+                  to_date: '2026-10-31'
+                  movement_type: all
+              transfer:
+                summary: transfer movement PDF
+                value:
+                  company_id: '02'
+                  analysis_type: transfer
+                  voucher_type: Stock Journal
+                  from_date: '2026-04-01'
+                  to_date: '2026-10-31'
+                  movement_type: all
+      responses:
+        '200':
+          description: Complete PDF attachment.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Invalid type, required selector, dates or display options.
+        '409':
+          description: Company not open, ambiguous Dealer Code or inconsistent source.
+        '502':
+          description: Tally export failed or a single voucher exceeds transport limits.
+        '504':
+          description: Connector report wait timed out.
   /api/v1/clients/activate-connector:
     post:
       tags:
@@ -2258,6 +2352,172 @@ components:
         type: string
         format: uuid
   schemas:
+    MovementAnalysisRequest:
+      type: object
+      required:
+        - company_id
+        - from_date
+        - to_date
+      properties:
+        company_id:
+          type: string
+          description: Required. Client-scoped company ID; company must be open in the configured Tally instance.
+          example: '02'
+        analysis_type:
+          type: string
+          enum:
+            - stock-item
+            - stock-group
+            - stock-category
+            - group
+            - ledger
+            - transfer
+          default: stock-item
+        from_date:
+          type: string
+          format: date
+        to_date:
+          type: string
+          format: date
+        movement_type:
+          type: string
+          enum:
+            - all
+            - inward
+            - outward
+          default: all
+        item_code:
+          type: string
+          description: Stock-item only. Has priority over stock_item.
+        stock_item:
+          type: string
+          description: Stock-item selector when item_code is absent.
+        stock_group:
+          type: string
+          description: Required for stock-group. Includes descendant stock groups.
+        stock_category:
+          type: string
+          description: Required for stock-category. Includes descendant categories.
+        group:
+          type: string
+          description: Required for group. Accounting group including descendant groups and their ledgers.
+        dealer_code:
+          type: string
+          description: Ledger only. Has priority over ledger_name; must uniquely resolve within this company.
+        ledger_name:
+          type: string
+          description: Ledger selector when dealer_code is absent.
+        voucher_type:
+          type: string
+          description: Required for transfer. Stock Journal or a voucher type derived from Stock Journal.
+        display_name:
+          type: string
+          enum:
+            - name-only
+          default: name-only
+        show_quantity:
+          type: string
+          enum:
+            - 'yes'
+            - 'no'
+          default: 'yes'
+        show_basic_rate_and_effective_rate:
+          type: string
+          enum:
+            - 'yes'
+            - 'no'
+          default: 'yes'
+        show_value:
+          type: string
+          enum:
+            - 'yes'
+            - 'no'
+          default: 'yes'
+        show_suppliers:
+          type: string
+          enum:
+            - 'yes'
+            - 'no'
+          default: 'yes'
+        show_transfers_inward:
+          type: string
+          enum:
+            - 'yes'
+            - 'no'
+          default: 'yes'
+        show_job_work_transfer_inward:
+          type: string
+          enum:
+            - 'yes'
+            - 'no'
+          default: 'no'
+        show_buyers:
+          type: string
+          enum:
+            - 'yes'
+            - 'no'
+          default: 'yes'
+        show_transfers_outward:
+          type: string
+          enum:
+            - 'yes'
+            - 'no'
+          default: 'yes'
+        show_job_work_transfer_outward:
+          type: string
+          enum:
+            - 'yes'
+            - 'no'
+          default: 'no'
+      oneOf:
+        - properties:
+            analysis_type:
+              enum:
+                - stock-item
+          anyOf:
+            - required:
+                - item_code
+            - required:
+                - stock_item
+        - required:
+            - analysis_type
+            - stock_group
+          properties:
+            analysis_type:
+              enum:
+                - stock-group
+        - required:
+            - analysis_type
+            - stock_category
+          properties:
+            analysis_type:
+              enum:
+                - stock-category
+        - required:
+            - analysis_type
+            - group
+          properties:
+            analysis_type:
+              enum:
+                - group
+        - required:
+            - analysis_type
+          properties:
+            analysis_type:
+              enum:
+                - ledger
+          anyOf:
+            - required:
+                - dealer_code
+            - required:
+                - ledger_name
+        - required:
+            - analysis_type
+            - voucher_type
+          properties:
+            analysis_type:
+              enum:
+                - transfer
     ClientRegistration:
       type: object
       required:

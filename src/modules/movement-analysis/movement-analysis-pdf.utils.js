@@ -11,13 +11,23 @@ function movementTotals(entries, direction) {
     const cents = items.reduce((sum, row) => sum + Math.round(row[`${direction}_value`] * 100), 0);
     return {
       quantity: `${Number(quantity.toFixed(4))} ${unit}`,
-      effective_rate: money(cents / 100 / quantity),
+      effective_rate: money(quantity ? cents / 100 / quantity : 0),
       value: money(cents / 100),
     };
   });
 }
 export function buildMovementPdfData(report, input = {}) {
   const options = normalizeMovementOptions(input);
+  const analysis_type = report.analysis_type || "stock-item";
+  const itemRows = analysis_type !== "stock-item";
+  const titles = {
+    "stock-item": "Item Movement Analysis",
+    "stock-group": "Stock Group Movement Analysis",
+    "stock-category": "Stock Category Movement Analysis",
+    group: "Group Movement Analysis",
+    ledger: "Ledger Movement Analysis",
+    transfer: "Transfer Analysis",
+  };
   const widths = ["*"];
   if (options.show_quantity) widths.push(75);
   if (options.show_basic_rate_and_effective_rate) widths.push(70, 75);
@@ -30,7 +40,7 @@ export function buildMovementPdfData(report, input = {}) {
     for (const [category, title, flag] of [
       [
         "party",
-        direction === "inward" ? "Suppliers" : "Buyers",
+        itemRows ? "Stock Items" : direction === "inward" ? "Suppliers" : "Buyers",
         direction === "inward" ? "show_suppliers" : "show_buyers",
       ],
       [
@@ -75,6 +85,8 @@ export function buildMovementPdfData(report, input = {}) {
   ];
   return {
     ...report,
+    analysis_title: titles[analysis_type],
+    analysis_label: report.analysis_label || report.stock_item,
     ...options,
     company_address,
     company_phone: details.phone,
