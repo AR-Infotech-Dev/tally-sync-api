@@ -8,7 +8,6 @@ export function createReportHandlers(config) {
     request,
     read,
     resultKey,
-    formatJson = (data) => data,
     generatePdf,
     filename,
     messages = {},
@@ -61,7 +60,7 @@ export function createReportHandlers(config) {
         });
         return res.status(200).send(buffer);
       }
-      return successResponse(res, { message: messages.success, data: { data: formatJson(data) } });
+      return successResponse(res, { message: messages.success, data: { data } });
     });
   const status =
     read &&
