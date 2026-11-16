@@ -143,19 +143,28 @@ test("All voucher types preserve socket event and action names", () => {
   }
 });
 test("Report and lookup dispatch preserve cached versus live Tally requirements", () => {
-  for (const type of ["ledger_statement", "group_summary", "outstanding", "stock_item_movement"]) {
+  for (const type of [
+    "ledger_statement",
+    "group_summary",
+    "group_list",
+    "outstanding",
+    "stock_item_movement",
+  ]) {
     assert.deepEqual(connectorJobSignal({ request_id: "R", transaction_type: type }), {
       event: SOCKET_EVENTS.ledgerStatementFetch,
       payload: { request_id: "R", transaction_type: type },
     });
-    assert.equal(getConnectorJobType(type).requireTally, type === "stock_item_movement");
+    assert.equal(
+      getConnectorJobType(type).requireTally,
+      ["group_list", "stock_item_movement"].includes(type),
+    );
   }
   for (const type of ["sales_order_lookup", "sales_voucher_lookup"])
     assert.deepEqual(connectorJobSignal({ request_id: "R", transaction_type: type }), {
       event: SOCKET_EVENTS.salesOrderFetch,
       payload: { request_id: "R" },
     });
-  assert.equal(Object.keys(connectorJobTypes).length, 12);
+  assert.equal(Object.keys(connectorJobTypes).length, 13);
   assert.equal(getConnectorJobType(), connectorJobTypes.sales_order);
   for (const type of ["unknown", "toString", "__proto__"])
     assert.throws(() => getConnectorJobType(type), /Unsupported/);

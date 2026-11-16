@@ -51,77 +51,77 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/MovementAnalysisRequest'
+              $ref: "#/components/schemas/MovementAnalysisRequest"
             examples:
               stock-item:
                 summary: stock-item movement PDF
                 value:
-                  company_id: '02'
+                  company_id: "02"
                   analysis_type: stock-item
                   stock_item: ALGAS 500ML - 24NOS
-                  from_date: '2026-04-01'
-                  to_date: '2026-10-31'
+                  from_date: "2026-04-01"
+                  to_date: "2026-10-31"
                   movement_type: all
               stock-group:
                 summary: stock-group movement PDF
                 value:
-                  company_id: '02'
+                  company_id: "02"
                   analysis_type: stock-group
                   stock_group: Finished Goods
-                  from_date: '2026-04-01'
-                  to_date: '2026-10-31'
+                  from_date: "2026-04-01"
+                  to_date: "2026-10-31"
                   movement_type: all
               stock-category:
                 summary: stock-category movement PDF
                 value:
-                  company_id: '02'
+                  company_id: "02"
                   analysis_type: stock-category
                   stock_category: Agricultural Products
-                  from_date: '2026-04-01'
-                  to_date: '2026-10-31'
+                  from_date: "2026-04-01"
+                  to_date: "2026-10-31"
                   movement_type: all
               group:
                 summary: group movement PDF
                 value:
-                  company_id: '02'
+                  company_id: "02"
                   analysis_type: group
                   group: Sundry Debtors
-                  from_date: '2026-04-01'
-                  to_date: '2026-10-31'
+                  from_date: "2026-04-01"
+                  to_date: "2026-10-31"
                   movement_type: all
               ledger:
                 summary: ledger movement PDF
                 value:
-                  company_id: '02'
+                  company_id: "02"
                   analysis_type: ledger
                   dealer_code: MH0001
-                  from_date: '2026-04-01'
-                  to_date: '2026-10-31'
+                  from_date: "2026-04-01"
+                  to_date: "2026-10-31"
                   movement_type: all
               transfer:
                 summary: transfer movement PDF
                 value:
-                  company_id: '02'
+                  company_id: "02"
                   analysis_type: transfer
                   voucher_type: Stock Journal
-                  from_date: '2026-04-01'
-                  to_date: '2026-10-31'
+                  from_date: "2026-04-01"
+                  to_date: "2026-10-31"
                   movement_type: all
       responses:
-        '200':
+        "200":
           description: Complete PDF attachment.
           content:
             application/pdf:
               schema:
                 type: string
                 format: binary
-        '400':
+        "400":
           description: Invalid type, required selector, dates or display options.
-        '409':
+        "409":
           description: Company not open, ambiguous Dealer Code or inconsistent source.
-        '502':
+        "502":
           description: Tally export failed or a single voucher exceeds transport limits.
-        '504':
+        "504":
           description: Connector report wait timed out.
   /api/v1/clients/activate-connector:
     post:
@@ -2362,7 +2362,7 @@ components:
         company_id:
           type: string
           description: Required. Client-scoped company ID; company must be open in the configured Tally instance.
-          example: '02'
+          example: "02"
         analysis_type:
           type: string
           enum:
@@ -2418,57 +2418,57 @@ components:
         show_quantity:
           type: string
           enum:
-            - 'yes'
-            - 'no'
-          default: 'yes'
+            - "yes"
+            - "no"
+          default: "yes"
         show_basic_rate_and_effective_rate:
           type: string
           enum:
-            - 'yes'
-            - 'no'
-          default: 'yes'
+            - "yes"
+            - "no"
+          default: "yes"
         show_value:
           type: string
           enum:
-            - 'yes'
-            - 'no'
-          default: 'yes'
+            - "yes"
+            - "no"
+          default: "yes"
         show_suppliers:
           type: string
           enum:
-            - 'yes'
-            - 'no'
-          default: 'yes'
+            - "yes"
+            - "no"
+          default: "yes"
         show_transfers_inward:
           type: string
           enum:
-            - 'yes'
-            - 'no'
-          default: 'yes'
+            - "yes"
+            - "no"
+          default: "yes"
         show_job_work_transfer_inward:
           type: string
           enum:
-            - 'yes'
-            - 'no'
-          default: 'no'
+            - "yes"
+            - "no"
+          default: "no"
         show_buyers:
           type: string
           enum:
-            - 'yes'
-            - 'no'
-          default: 'yes'
+            - "yes"
+            - "no"
+          default: "yes"
         show_transfers_outward:
           type: string
           enum:
-            - 'yes'
-            - 'no'
-          default: 'yes'
+            - "yes"
+            - "no"
+          default: "yes"
         show_job_work_transfer_outward:
           type: string
           enum:
-            - 'yes'
-            - 'no'
-          default: 'no'
+            - "yes"
+            - "no"
+          default: "no"
       oneOf:
         - properties:
             analysis_type:

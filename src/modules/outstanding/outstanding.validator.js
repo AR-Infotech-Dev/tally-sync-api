@@ -11,6 +11,9 @@ export function validateOutstanding(body = {}) {
 export function validateOutstandingTotal(body = {}) {
   const errors = validateOutstanding(body);
   if (body?.to_date !== undefined && !isIsoDate(body.to_date, { bounded: true }))
-    errors.push({ field: "to_date", message: "Use a valid YYYY-MM-DD date between 1900 and 2099." });
+    errors.push({
+      field: "to_date",
+      message: "Use a valid YYYY-MM-DD date between 1900 and 2099.",
+    });
   return errors;
 }

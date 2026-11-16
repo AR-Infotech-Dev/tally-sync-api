@@ -13,10 +13,13 @@ export async function requestOutstandingTotal(clientId, input, shouldStop) {
   const result = await requestConnectorReport(clientId, lookup, "outstanding", shouldStop);
   const report = result.request?.tally_result?.outstanding;
   if (report && Object.hasOwn(report, "bills"))
-    throw Object.assign(new Error("Update the Connector to retrieve the ledger outstanding total."), {
-      apiCode: 2012,
-      status: 409,
-    });
+    throw Object.assign(
+      new Error("Update the Connector to retrieve the ledger outstanding total."),
+      {
+        apiCode: 2012,
+        status: 409,
+      },
+    );
   return result;
 }
 
