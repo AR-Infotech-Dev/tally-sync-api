@@ -143,15 +143,15 @@
           {{/if}}
         </tr>
       </thead>
-      <tbody>
+      <tbody class="text-sm">
         {{#each bills}}
         <tr>
-          <td>{{date}}</td>
+          <td class="whitespace-nowrap">{{date}}</td>
           <td>
             {{reference}} {{#if is_advance}}
             <em>(advance)</em>
             {{/if}}
-            <small>
+            <small class="text-sm">
               {{#if ../show_order_number}}
               <br />
               {{order_number}} {{/if}} {{#if ../show_narrations}}
@@ -164,7 +164,7 @@
           {{/if}} {{#if ../show_pending_amount}}
           <td style="text-align:right"><strong>{{pending_amount}}</strong></td>
           {{/if}} {{#if ../show_due_date}}
-          <td style="text-align: right;">{{due_date}}</td>
+          <td class="whitespace-nowrap" style="text-align: right;">{{due_date}}</td>
           {{/if}} {{#if ../show_overdue_days}}
           <td class="italic" style="text-align:right">{{overdue_days}}</td>
           {{/if}}
