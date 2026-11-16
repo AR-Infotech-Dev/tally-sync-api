@@ -55,6 +55,7 @@ export const connectorJobTypes = Object.freeze({
   },
   ledger_statement: report("Ledger Statement"),
   group_summary: report("Group Summary"),
+  group_list: report("Accounting Groups", true),
   outstanding: report("Outstanding"),
   stock_item_movement: report("Stock Item Movement Analysis", true),
 });

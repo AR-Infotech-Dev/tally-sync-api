@@ -5,9 +5,11 @@ import {
   getOutstanding,
   getOutstandingPdf,
   getOutstandingStatus,
+  getOutstandingTotal,
 } from "./outstanding.controller.js";
 const router = express.Router();
 router.post("/", requireClientApiKey, requireConnectedConnector, getOutstanding);
+router.post("/total", requireClientApiKey, requireConnectedConnector, getOutstandingTotal);
 router.post("/pdf", requireClientApiKey, requireConnectedConnector, getOutstandingPdf);
 router.get("/:requestId/status", requireClientApiKey, getOutstandingStatus);
 export default router;

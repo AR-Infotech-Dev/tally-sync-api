@@ -1,6 +1,10 @@
 import { createReportHandlers } from "../../shared/http/reportHandlers.js";
-import { requestOutstanding, readOutstanding } from "./outstanding.service.js";
-import { validateOutstanding } from "./outstanding.validator.js";
+import {
+  requestOutstanding,
+  requestOutstandingTotal,
+  readOutstanding,
+} from "./outstanding.service.js";
+import { validateOutstanding, validateOutstandingTotal } from "./outstanding.validator.js";
 import { generateOutstandingPdf } from "./outstanding-pdf.service.js";
 
 const handlers = createReportHandlers({
@@ -24,5 +28,13 @@ const handlers = createReportHandlers({
   },
 });
 export const getOutstanding = handlers.json;
+export const getOutstandingTotal = createReportHandlers({
+  label: "Outstanding total",
+  validate: validateOutstandingTotal,
+  request: requestOutstandingTotal,
+  resultKey: "outstanding",
+  missingJobCode: 2012,
+  missingJobStatus: 502,
+}).json;
 export const getOutstandingPdf = handlers.pdf;
 export const getOutstandingStatus = handlers.status;
