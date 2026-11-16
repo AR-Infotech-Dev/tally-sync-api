@@ -27,14 +27,20 @@ const handlers = createReportHandlers({
     success: "Outstanding report retrieved from local synced database.",
   },
 });
-export const getOutstanding = handlers.json;
-export const getOutstandingTotal = createReportHandlers({
+const totalOptions = {
   label: "Outstanding total",
   validate: validateOutstandingTotal,
   request: requestOutstandingTotal,
   resultKey: "outstanding",
   missingJobCode: 2012,
   missingJobStatus: 502,
+};
+export const getOutstanding = createReportHandlers({
+  ...totalOptions,
+  formatJson: ({ total, total_direction }) => ({
+    total: total_direction === "Cr" ? -total : total,
+  }),
 }).json;
+export const getOutstandingTotal = createReportHandlers(totalOptions).json;
 export const getOutstandingPdf = handlers.pdf;
 export const getOutstandingStatus = handlers.status;
