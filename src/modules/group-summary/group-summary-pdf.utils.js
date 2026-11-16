@@ -31,42 +31,53 @@ export function buildGroupSummaryPdfData(summary, input = {}) {
     debit: value?.type === "Dr" ? money(amount(value.amount)) : "",
     credit: value?.type === "Cr" ? money(amount(value.amount)) : "",
   });
-  const rows = (summary.ledgers || [])
-    .filter(
-      (ledger) =>
-        options.show_zero_balance ||
-        [
-          ledger.opening_balance?.amount,
-          ledger.total_debit,
-          ledger.total_credit,
-          ledger.closing_balance?.amount,
-        ].some((value) => Number(value || 0) !== 0),
-    )
-    .map((ledger) => {
-      const opening = split(ledger.opening_balance);
-      const closing = split(ledger.closing_balance);
-      return {
-        ledger_name: ledger.ledger_name || "-",
-        opening_debit: options.show_opening_balance ? opening.debit : "",
-        opening_credit: options.show_opening_balance ? opening.credit : "",
-        opening_percentage: options.show_opening_balance
-          ? pct(ledger.opening_balance?.amount, summary.opening_balance?.amount)
-          : "",
-        transaction_debit: options.show_transactions ? money(amount(ledger.total_debit)) : "",
-        transaction_credit: options.show_transactions ? money(amount(ledger.total_credit)) : "",
-        closing_debit: options.show_closing_balance ? closing.debit : "",
-        closing_credit: options.show_closing_balance ? closing.credit : "",
-        closing_percentage: options.show_closing_balance
-          ? pct(ledger.closing_balance?.amount, summary.closing_balance?.amount)
-          : "",
-      };
-    });
+  const ledgers = (summary.ledgers || []).filter(
+    (ledger) =>
+      options.show_zero_balance ||
+      [
+        ledger.opening_balance?.amount,
+        ledger.total_debit,
+        ledger.total_credit,
+        ledger.closing_balance?.amount,
+      ].some((value) => Number(value || 0) !== 0),
+  );
+  const rows = ledgers.map((ledger) => {
+    const opening = split(ledger.opening_balance);
+    const closing = split(ledger.closing_balance);
+    return {
+      ledger_name: ledger.ledger_name || "-",
+      opening_debit: options.show_opening_balance ? opening.debit : "",
+      opening_credit: options.show_opening_balance ? opening.credit : "",
+      opening_percentage: options.show_opening_balance
+        ? pct(ledger.opening_balance?.amount, summary.opening_balance?.amount)
+        : "",
+      transaction_debit: options.show_transactions ? money(amount(ledger.total_debit)) : "",
+      transaction_credit: options.show_transactions ? money(amount(ledger.total_credit)) : "",
+      closing_debit: options.show_closing_balance ? closing.debit : "",
+      closing_credit: options.show_closing_balance ? closing.credit : "",
+      closing_percentage: options.show_closing_balance
+        ? pct(ledger.closing_balance?.amount, summary.closing_balance?.amount)
+        : "",
+    };
+  });
   const widths = ["*"];
   if (options.show_opening_balance) widths.push(82, 82, 42);
   if (options.show_transactions) widths.push(75, 75);
   if (options.show_closing_balance) widths.push(82, 82, 42);
-  const opening = split(summary.opening_balance);
-  const closing = split(summary.closing_balance);
+  function sumBalanceColumns(field) {
+    const cents = { Dr: 0, Cr: 0 };
+    for (const ledger of ledgers) {
+      const balance = ledger[field];
+      if (balance?.type === "Dr" || balance?.type === "Cr")
+        cents[balance.type] += Math.round(Number(balance.amount || 0) * 100);
+    }
+    return {
+      debit: cents.Dr ? money(amount(cents.Dr / 100)) : "",
+      credit: cents.Cr ? money(amount(cents.Cr / 100)) : "",
+    };
+  }
+  const opening = sumBalanceColumns("opening_balance");
+  const closing = sumBalanceColumns("closing_balance");
   return {
     ...options,
     table_widths: JSON.stringify(widths),
