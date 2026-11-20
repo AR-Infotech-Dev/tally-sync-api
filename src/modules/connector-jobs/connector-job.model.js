@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { getMongoCollection } from "../../config/mongo.database.js";
+import { assertLedgerCreateReplay } from "../ledgers/ledger-create.utils.js";
 
 const COLLECTION = "sales_order_requests";
 const configuredRetentionDays = Number.parseInt(process.env.REQUEST_RETENTION_DAYS || "90", 10);
@@ -44,6 +45,7 @@ export async function createConnectorJob(input) {
     destination: input.destination,
     transaction_type: input.transaction_type || "sales_order",
     ...(input.lookup ? { lookup: input.lookup } : {}),
+    ...(input.transaction_type === "ledger_create" ? { ledger: input.ledger } : {}),
     ...(input.sales_order || input.sales ? { sales_order: input.sales_order || input.sales } : {}),
     ...(input.receipt ? { receipt: input.receipt } : {}),
     ...(input.purchase_order ? { purchase_order: input.purchase_order } : {}),
@@ -66,6 +68,7 @@ export async function createConnectorJob(input) {
       idempotency_key: input.idempotency_key,
     });
     if (!existing) throw error;
+    assertLedgerCreateReplay(existing, input);
     return { request: existing, duplicate: true };
   }
 }
@@ -73,7 +76,16 @@ export async function createConnectorJob(input) {
 export async function findQueuedConnectorJobs(clientId) {
   const collection = await getCollection();
   return collection
-    .find({ client_id: clientId, status: "queued" })
+    .find({
+      client_id: clientId,
+      $or: [
+        { status: "queued" },
+        {
+          transaction_type: "ledger_create",
+          status: { $in: ["processing", "fetching", "building_xml", "pushing"] },
+        },
+      ],
+    })
     .sort({ created_at: 1 })
     .project({ request_id: 1, transaction_type: 1 })
     .toArray();
@@ -91,6 +103,50 @@ export async function markConnectorJobProcessing(clientId, requestId) {
 export async function getConnectorJob(clientId, requestId) {
   const collection = await getCollection();
   return collection.findOne({ client_id: clientId, request_id: requestId });
+}
+
+export async function claimLedgerImport(collection, clientId, requestId) {
+  const result = await collection.updateOne(
+    {
+      client_id: clientId,
+      request_id: requestId,
+      transaction_type: "ledger_create",
+      ledger_import_attempted_at: { $exists: false },
+      status: { $nin: ["succeeded", "failed"] },
+    },
+    { $set: { ledger_import_attempted_at: new Date(), updated_at: new Date() } },
+  );
+  const request = await collection.findOne({
+    client_id: clientId,
+    request_id: requestId,
+    transaction_type: "ledger_create",
+  });
+  return request
+    ? {
+        request_id: requestId,
+        claimed: result.modifiedCount === 1,
+        import_attempted: Boolean(request.ledger_import_attempted_at),
+      }
+    : null;
+}
+
+export async function claimConnectorLedgerImport(clientId, requestId) {
+  return claimLedgerImport(await getCollection(), clientId, requestId);
+}
+
+export async function requeueLedgerVerification(clientId, requestId) {
+  const collection = await getCollection();
+  await collection.updateOne(
+    {
+      client_id: clientId,
+      request_id: requestId,
+      transaction_type: "ledger_create",
+      status: "failed",
+      "tally_result.error_code": "LEDGER_CREATE_OUTCOME_UNKNOWN",
+    },
+    { $set: { status: "queued", updated_at: new Date() }, $unset: { expires_at: "" } },
+  );
+  return getConnectorJob(clientId, requestId);
 }
 
 export async function findSalesVouchersByNumber(clientId, company, voucherNumber, partyLedger) {
@@ -135,6 +191,17 @@ export async function updateConnectorJob(clientId, requestId, update) {
   if (update.status && update.status !== "succeeded" && update.status !== "failed") {
     updateOperation.$unset = { expires_at: "" };
   }
-  await collection.updateOne({ client_id: clientId, request_id: requestId }, updateOperation);
+  const filter = { client_id: clientId, request_id: requestId };
+  if (update.transaction_type)
+    filter.transaction_type =
+      update.transaction_type === "ledger_create" ? "ledger_create" : { $ne: "ledger_create" };
+  if (update.status !== "succeeded")
+    filter.$or = [
+      { transaction_type: { $ne: "ledger_create" } },
+      { status: { $nin: update.status === "failed" ? ["succeeded"] : ["succeeded", "failed"] } },
+    ];
+  if (update.status === "succeeded")
+    updateOperation.$unset = { ...updateOperation.$unset, error: "" };
+  await collection.updateOne(filter, updateOperation);
   return collection.findOne({ client_id: clientId, request_id: requestId });
 }

@@ -36,7 +36,7 @@ const spec = {
   info: {
     ...sourceSpec.info,
     description:
-      "Client API for registration, Sales Orders, Sales Vouchers, Receipts, Purchase Orders, Purchases, Payments, ledger statements and PDF downloads. Application authentication uses X-Client-ID plus X-API-Key. Voucher pushes wait for a final result: HTTP 200 succeeds, 502 rejects, and 504 returns request_id when the wait expires. Pending Sales PDF exports use HTTP 202 polling. Examples use fictional values and require matching Tally masters.",
+      "Client API for registration, Sales Orders, Sales Vouchers, Receipts, Purchase Orders, Purchases, Payments, Ledger Creation, ledger statements and PDF downloads. Application authentication uses X-Client-ID plus X-API-Key. Create operations wait for a final result; HTTP 504 returns request_id when the wait expires. Ledger Creation verifies the ledger by read-back and distinguishes conflicts and uncertain outcomes. Pending Sales PDF exports use HTTP 202 polling. Examples use fictional values and require matching Tally masters.",
   },
   paths: Object.fromEntries(
     Object.entries(sourceSpec.paths).flatMap(([path, item]) => {
@@ -241,6 +241,7 @@ const groupOrder = [
   "Purchase Orders",
   "Purchase Vouchers",
   "Payment Vouchers",
+  "Ledger Creation",
   "Ledger Statements",
   "Health",
 ];
@@ -252,6 +253,8 @@ const descriptions = {
   "Purchase Orders": "Create supplier purchase orders with an explicit delivery due date.",
   "Purchase Vouchers": "Record supplier purchases with inventory and a purchase ledger.",
   "Payment Vouchers": "Record supplier payments from a cash or bank ledger.",
+  "Ledger Creation":
+    "Create a ledger in an open Tally company, verify its identity, and read creation status.",
   "Ledger Statements": "Read a synced ledger statement as JSON or a downloadable PDF.",
   Health: "Check whether the API server is running. This does not confirm Tally connectivity.",
   "Connector Reference":

@@ -7,6 +7,12 @@ const report = (label, requireTally = false) => ({
   report: true,
 });
 export const connectorJobTypes = Object.freeze({
+  ledger_create: {
+    label: "Ledger Creation",
+    event: SOCKET_EVENTS.ledgerCreate,
+    action: "ledger.create",
+    requireTally: true,
+  },
   sales_order: {
     label: "Sales Order",
     event: SOCKET_EVENTS.salesOrderPush,

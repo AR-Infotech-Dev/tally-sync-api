@@ -7,6 +7,7 @@ export const SOCKET_EVENTS = Object.freeze({
   connectorTest: "connector:test",
   connectorTallyCheck: "connector:tally:check",
   companyList: "company:list",
+  ledgerCreate: "ledger:create",
   salesOrderPush: "sales-order:push",
   salesOrderFetch: "sales-order:fetch",
   ledgerStatementFetch: "ledger-statement:fetch",
@@ -17,5 +18,6 @@ export const SOCKET_EVENTS = Object.freeze({
   paymentVoucherPush: "payment-voucher:push",
   salesVoucherPdfExport: "sales-voucher:pdf:export",
   salesOrderUpdate: "sales-order:update",
+  voucherUpdated: "voucher.updated",
   tallySync: "tally:sync",
 });

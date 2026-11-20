@@ -1,5 +1,9 @@
 import { emitToConnector } from "../../socket/index.js";
-import { createConnectorJob, getConnectorJob } from "./connector-job.model.js";
+import {
+  createConnectorJob,
+  getConnectorJob,
+  requeueLedgerVerification,
+} from "./connector-job.model.js";
 import { connectorJobSignal, getConnectorJobType } from "./connector-job.registry.js";
 import { recordConsoleLog } from "../console/consoleLog.store.js";
 import { resolveRequestCompany } from "../companies/company.service.js";
@@ -20,6 +24,13 @@ export async function queueConnectorJob(input) {
     ...(input.lookup ? { lookup: { ...input.lookup, ...company } } : {}),
     transaction_type: type,
   });
+  if (
+    type === "ledger_create" &&
+    result.duplicate &&
+    result.request.status === "failed" &&
+    result.request.tally_result?.error_code === "LEDGER_CREATE_OUTCOME_UNKNOWN"
+  )
+    result.request = await requeueLedgerVerification(input.client_id, result.request.request_id);
   let connectorNotified = false;
   if (result.request.status === "queued") {
     const signal = connectorJobSignal(result.request);

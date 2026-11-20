@@ -15,6 +15,7 @@ import { recordConsoleLog } from "../console/consoleLog.store.js";
 import { dispatchPendingSalesVoucherPdfs } from "../sales/sales-pdf.service.js";
 import { normalizeCompanies } from "../companies/company.identity.js";
 import { saveClientCompanies, readClientCompanies } from "../companies/company.model.js";
+import { isCompanySequence } from "../companies/company-sequence.model.js";
 
 async function emitPendingConnectorJobs(clientId, socket) {
   const requests = await findQueuedConnectorJobs(clientId);
@@ -259,6 +260,7 @@ export function registerConnectorSocketHandlers(socket) {
         SOCKET_EVENTS.purchaseOrderPush,
         SOCKET_EVENTS.purchaseVoucherPush,
         SOCKET_EVENTS.paymentVoucherPush,
+        SOCKET_EVENTS.ledgerCreate,
       ].includes(payload.event) &&
       typeof payload.request_id === "string"
     ) {
@@ -281,12 +283,62 @@ export function registerConnectorSocketHandlers(socket) {
     });
   });
 
+  socket.on(SOCKET_EVENTS.voucherUpdated, async (payload, acknowledge) => {
+    const ack = typeof acknowledge === "function" ? acknowledge : () => {};
+    const { clientId, connectorId } = socket.data;
+    if (!clientId || !connectorId) {
+      ack({ success: false, code: "CONNECTOR_NOT_REGISTERED" });
+      return;
+    }
+
+    const { company_id, voucher_id } = payload ?? {};
+    if (
+      !isCompanySequence(company_id) ||
+      typeof voucher_id !== "string" ||
+      !/^[1-9]\d*$/.test(voucher_id)
+    ) {
+      ack({
+        success: false,
+        code: "INVALID_VOUCHER_UPDATE",
+        message: "Valid company_id and voucher_id are required.",
+      });
+      return;
+    }
+
+    try {
+      const companies = await readClientCompanies(clientId);
+      if (!companies.some((company) => company.company_id === company_id)) {
+        ack({
+          success: false,
+          code: "COMPANY_NOT_FOUND",
+          message: "Company ID does not exist for this client.",
+        });
+        return;
+      }
+      recordConsoleLog("info", "Voucher updated in Tally", {
+        source: "socket",
+        clientId,
+        connectorId,
+        companyId: company_id,
+        voucherId: voucher_id,
+      });
+      ack({ success: true });
+    } catch {
+      ack({
+        success: false,
+        code: "VOUCHER_UPDATE_UNAVAILABLE",
+        message: "Voucher update could not be recorded.",
+      });
+    }
+  });
+
   socket.on(SOCKET_EVENTS.salesOrderUpdate, async (payload = {}) => {
     if (!socket.data.clientId || typeof payload.request_id !== "string") return;
     const allowedStatuses = new Set(["fetching", "building_xml", "pushing", "succeeded", "failed"]);
     if (!allowedStatuses.has(payload.status)) return;
     try {
       await updateConnectorJob(socket.data.clientId, payload.request_id, {
+        transaction_type: payload.transaction_type,
         status: payload.status,
         error: payload.error,
         tally_result: payload.tally_result,

@@ -1,6 +1,12 @@
 import { requireConnectedConnector } from "../../middlewares/connectedConnector.middleware.js";
 import express from "express";
 import { requireClientApiKey } from "../../middlewares/clientApiKey.middleware.js";
+import { requireConnectorKey } from "../../middlewares/connectorApiKey.middleware.js";
+import {
+  createLedger,
+  getLedgerCreateRequest,
+  claimLedgerCreate,
+} from "./ledger-create.controller.js";
 import {
   getLedgerStatement,
   getLedgerStatementPdf,
@@ -8,6 +14,10 @@ import {
 } from "./ledger.controller.js";
 
 const router = express.Router();
+router.post("/create", requireClientApiKey, requireConnectedConnector, createLedger);
+router.get("/create/:requestId/status", requireClientApiKey, getLedgerCreateRequest);
+router.get("/create/:requestId/connector", requireConnectorKey, getLedgerCreateRequest);
+router.post("/create/:requestId/connector/claim", requireConnectorKey, claimLedgerCreate);
 router.post("/statement", requireClientApiKey, requireConnectedConnector, getLedgerStatement);
 router.post(
   "/statement/pdf",

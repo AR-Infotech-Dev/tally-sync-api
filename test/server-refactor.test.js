@@ -147,6 +147,7 @@ test("Report and lookup dispatch preserve cached versus live Tally requirements"
     "ledger_statement",
     "group_summary",
     "group_list",
+    "master_data",
     "outstanding",
     "stock_item_movement",
   ]) {
@@ -156,7 +157,7 @@ test("Report and lookup dispatch preserve cached versus live Tally requirements"
     });
     assert.equal(
       getConnectorJobType(type).requireTally,
-      ["group_list", "stock_item_movement"].includes(type),
+      ["group_list", "master_data", "stock_item_movement"].includes(type),
     );
   }
   for (const type of ["sales_order_lookup", "sales_voucher_lookup"])
@@ -164,7 +165,7 @@ test("Report and lookup dispatch preserve cached versus live Tally requirements"
       event: SOCKET_EVENTS.salesOrderFetch,
       payload: { request_id: "R" },
     });
-  assert.equal(Object.keys(connectorJobTypes).length, 13);
+  assert.equal(Object.keys(connectorJobTypes).length, 15);
   assert.equal(getConnectorJobType(), connectorJobTypes.sales_order);
   for (const type of ["unknown", "toString", "__proto__"])
     assert.throws(() => getConnectorJobType(type), /Unsupported/);

@@ -16,6 +16,7 @@ servers:
   - url: https://sync.flowups.in
     description: Production Server
 tags:
+  - name: Ledger Creation
   - name: Movement Analysis
   - name: Health
   - name: Client Registration
@@ -30,6 +31,133 @@ tags:
   - name: Admin Console
     description: Administrative session endpoints, separate from CRM API keys.
 paths:
+  /api/v1/ledgers/create:
+    post:
+      tags: [Ledger Creation]
+      operationId: createLedger
+      summary: Create and verify one ledger in Tally
+      description: >-
+        Requires Connector 0.2.4 or newer, an open client-scoped company and an existing parent group.
+        This is create-only, with no opening balance, GST or address fields in this version.
+        Names and non-empty dealer codes are checked within the selected company. dealer_code is
+        mapped to Tally Narration. The response waits for import and read-back verification.
+        Reuse idempotency_key only for the same company and payload. A durable Server claim and
+        Connector journal prevent an automatic second import after an uncertain response or reinstall.
+        Repeating an uncertain request performs read-back verification only. Creation may already have
+        completed when HTTP 409 reports LEDGER_CREATE_OUTCOME_UNKNOWN. HTTP 504 means poll status.
+        Cache queue failure does not turn verified Tally creation into a failed import.
+      security:
+        - clientId: []
+          clientApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LedgerCreateRequest"
+            example:
+              idempotency_key: ledger-AH0003-001
+              destination:
+                company_id: "02"
+              ledger:
+                name: ABC Traders
+                parent: Sundry Debtors
+                dealer_code: AH0003
+                bill_wise: true
+      responses:
+        "200":
+          description: The requested ledger was read back and verified in Tally. Cache update may still be queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LedgerCreateResponse"
+        "400":
+          description: Invalid or unsupported fields, including opening balance or GST fields in this version.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "401":
+          description: Invalid client credentials.
+        "404":
+          description: Company or request not found for this client.
+        "409":
+          description: Duplicate name/code, unknown parent, idempotency conflict, Tally rejection or uncertain creation outcome. Inspect error_code and tally_result; do not blindly create with a new key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "502":
+          description: Invalid or incomplete upstream Tally result.
+        "503":
+          description: Connector/Tally unavailable, local creation storage unavailable, or a local sync holds Tally busy.
+        "504":
+          description: Response deadline expired. Use request_id to read status before retrying.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+  /api/v1/ledgers/create/{requestId}/status:
+    get:
+      tags: [Ledger Creation]
+      operationId: getLedgerCreateStatus
+      summary: Read a ledger creation request and its verified result
+      description: Client-scoped status read. Does not require an online Connector and does not itself import or retry anything.
+      security:
+        - clientId: []
+          clientApiKey: []
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: Stored request and any creation, verification and cache queue results.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RequestRecord" }
+        "401":
+          description: Invalid client credentials.
+        "404":
+          description: No ledger creation request with this ID belongs to this client.
+  /api/v1/ledgers/create/{requestId}/connector:
+    get:
+      tags: [Connector Reference]
+      operationId: getLedgerCreateConnectorJob
+      summary: Fetch a ledger creation job (Connector only)
+      x-audience: connector
+      security:
+        - clientId: []
+          connectorApiKey: []
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: Client-scoped ledger creation job.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RequestRecord" }
+        "401": { description: Invalid Connector credentials. }
+        "404": { description: No matching ledger creation job. }
+  /api/v1/ledgers/create/{requestId}/connector/claim:
+    post:
+      tags: [Connector Reference]
+      operationId: claimLedgerCreateImport
+      summary: Atomically claim the sole Tally import attempt (Connector only)
+      x-audience: connector
+      security:
+        - clientId: []
+          connectorApiKey: []
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: Only claimed=true authorizes an import. claimed=false permits read-back verification only.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request_id: { type: string }
+                  claimed: { type: boolean }
+                  import_attempted: { type: boolean }
+        "401": { description: Invalid Connector credentials. }
+        "404": { description: No matching client-scoped ledger creation job. }
   /api/v1/movement-analysis/pdf:
     post:
       tags:
@@ -2352,6 +2480,94 @@ components:
         type: string
         format: uuid
   schemas:
+    LedgerCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [idempotency_key, destination, ledger]
+      properties:
+        idempotency_key:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Required non-blank retry key. Reuse only with the same company and normalized payload.
+        destination:
+          type: object
+          additionalProperties: false
+          required: [company_id]
+          properties:
+            company_id:
+              type: string
+              description: Client company ID from GET /api/v1/companies. The company must be open.
+              example: "02"
+        ledger:
+          $ref: "#/components/schemas/LedgerCreateInput"
+    LedgerCreateInput:
+      type: object
+      additionalProperties: false
+      required: [name, parent]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Ledger name. Leading/trailing whitespace is removed; XML/control characters are validated.
+        parent:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Existing Tally accounting group. The API never creates or substitutes a group automatically.
+        dealer_code:
+          type: string
+          maxLength: 200
+          default: ""
+          description: Optional code mapped to Tally Narration. A non-empty code must be unused in the selected company.
+        bill_wise:
+          type: boolean
+          default: false
+          description: Sets Maintain balances bill-by-bill. Does not import opening bills.
+    LedgerCreateResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        code: { type: integer, example: 1000 }
+        type: { type: string, example: OK }
+        message: { type: string }
+        request_id: { type: string, format: uuid }
+        status: { type: string, example: succeeded }
+        duplicate: { type: boolean }
+        transaction_type: { type: string, enum: [ledger_create] }
+        ledger:
+          type: object
+          properties:
+            company_id: { type: string, example: "02" }
+            name: { type: string }
+            parent: { type: string }
+            dealer_code: { type: string }
+            bill_wise: { type: boolean }
+            master_id: { type: string }
+            guid: { type: string }
+        tally_result:
+          type: object
+          properties:
+            verified: { type: boolean }
+            created:
+              type: boolean
+              nullable: true
+              description: true only with an accepted creation summary; null when existence was verified after an uncertain response.
+            recovered: { type: boolean }
+            outcome:
+              type: string
+              enum: [created_and_verified, verified_after_uncertain_import]
+            import_result:
+              type: object
+              nullable: true
+              additionalProperties: true
+            cache_update:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [queued, pending, initial_sync_required]
     MovementAnalysisRequest:
       type: object
       required:
@@ -2803,8 +3019,9 @@ components:
         error_code:
           type: string
           description: >-
-            Optional machine-readable availability failure: CONNECTOR_NOT_CONNECTED, CONNECTOR_NOT_RESPONDING,
-            TALLY_NOT_CONNECTED, TALLY_TIMEOUT or CONNECTOR_CHECK_TIMEOUT.
+            Optional machine-readable availability or operation failure. Ledger creation can return
+            LEDGER_ALREADY_EXISTS, DEALER_CODE_CONFLICT, LEDGER_PARENT_NOT_FOUND, IDEMPOTENCY_CONFLICT,
+            LEDGER_IMPORT_REJECTED, LEDGER_CREATE_OUTCOME_UNKNOWN or SYNC_BUSY.
         request_id:
           type: string
           format: uuid
@@ -2964,6 +3181,12 @@ components:
         tally_result:
           type: object
           additionalProperties: true
+        ledger:
+          $ref: "#/components/schemas/LedgerCreateInput"
+        ledger_import_attempted_at:
+          type: string
+          format: date-time
+          description: Server records the sole permitted ledger import attempt before sending XML.
         sales_order:
           type: object
           additionalProperties: true
