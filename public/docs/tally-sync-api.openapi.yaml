@@ -37,8 +37,9 @@ paths:
       operationId: createLedger
       summary: Create and verify one ledger in Tally
       description: >-
-        Requires Connector 0.2.4 or newer, an open client-scoped company and an existing parent group.
-        This is create-only, with no opening balance, GST or address fields in this version.
+        Requires Connector 0.2.5 or newer, an open client-scoped company and an existing parent group.
+        This is create-only and supports alias, description, credit, mailing, tax, party banking and opening details.
+        Opening and dated mailing/GST entries use company Books From, not a later financial-year opening.
         Names and non-empty dealer codes are checked within the selected company. dealer_code is
         mapped to Tally Narration. The response waits for import and read-back verification.
         Reuse idempotency_key only for the same company and payload. A durable Server claim and
@@ -64,6 +65,28 @@ paths:
                 parent: Sundry Debtors
                 dealer_code: AH0003
                 bill_wise: true
+                alias: ABC-CUSTOMER
+                description: Customer ledger
+                credit_details:
+                  default_credit_period_days: 30
+                  check_credit_days_during_voucher_entry: true
+                mailing_details:
+                  name: ABC Traders
+                  address:
+                    - Shop No. 10
+                    - Sample Road
+                    - Pune
+                  state: Maharashtra
+                  country: India
+                  pincode: "411001"
+                tax_details:
+                  pan: ""
+                  registration_type: Unregistered/Consumer
+                  gstin: ""
+                bank_details: null
+                opening_balance:
+                  amount: 0
+                  type: Dr
       responses:
         "200":
           description: The requested ledger was read back and verified in Tally. Cache update may still be queued.
@@ -72,7 +95,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/LedgerCreateResponse"
         "400":
-          description: Invalid or unsupported fields, including opening balance or GST fields in this version.
+          description: Invalid, malformed or unsupported fields. Nested errors identify the precise ledger field.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
@@ -2504,7 +2527,9 @@ components:
     LedgerCreateInput:
       type: object
       additionalProperties: false
-      required: [name, parent]
+      required:
+        - name
+        - parent
       properties:
         name:
           type: string
@@ -2525,39 +2550,218 @@ components:
           type: boolean
           default: false
           description: Sets Maintain balances bill-by-bill. Does not import opening bills.
+        alias:
+          type: string
+          maxLength: 255
+          description: Optional alias, checked against names and aliases within the selected company.
+        description:
+          type: string
+          maxLength: 1000
+        credit_details:
+          $ref: "#/components/schemas/LedgerCreditDetails"
+        mailing_details:
+          $ref: "#/components/schemas/LedgerMailingDetails"
+        tax_details:
+          $ref: "#/components/schemas/LedgerTaxDetails"
+        bank_details:
+          $ref: "#/components/schemas/LedgerBankDetails"
+        opening_balance:
+          $ref: "#/components/schemas/LedgerOpeningBalance"
+    LedgerCreditDetails:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        default_credit_period_days:
+          type: integer
+          minimum: 0
+          maximum: 36500
+        check_credit_days_during_voucher_entry:
+          type: boolean
+    LedgerMailingDetails:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        address:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 255
+            minLength: 1
+        state:
+          type: string
+          maxLength: 255
+        country:
+          type: string
+          maxLength: 255
+        pincode:
+          type: string
+          maxLength: 20
+      description: >-
+        Dated mailing details start at the selected company Books From date. Country/state values remain subject
+        to native Tally validation.
+    LedgerTaxDetails:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        pan:
+          type: string
+          maxLength: 10
+          description: PAN or empty string; trimmed and uppercased. Syntax is checked, not registration status.
+        registration_type:
+          type: string
+          enum:
+            - Regular
+            - Composition
+            - Unregistered
+            - Unregistered/Consumer
+            - Consumer
+            - Unknown
+          description: Unregistered normalizes to Unregistered/Consumer.
+        gstin:
+          type: string
+          maxLength: 15
+          description: GSTIN or empty string; trimmed/uppercased. Must contain the supplied PAN when both are supplied.
+      description: Prime 3+ GST registration entries start at the selected company Books From date.
+    LedgerBankDetails:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        account_holder_name:
+          type: string
+          maxLength: 255
+          minLength: 1
+        bank_name:
+          type: string
+          maxLength: 255
+          minLength: 1
+        branch:
+          type: string
+          maxLength: 255
+        account_number:
+          type: string
+          maxLength: 40
+          minLength: 1
+          description: String to preserve leading zeros.
+        ifsc_code:
+          type: string
+          maxLength: 11
+          description: 11-character IFSC or empty string; uppercased and syntax checked.
+      nullable: true
+      required:
+        - account_holder_name
+        - bank_name
+        - account_number
+      description: >-
+        One default party payment account. Omit or send null for no banking details; not a Bank Accounts ledger or
+        multiple accounts.
+    LedgerOpeningBalance:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        amount:
+          type: number
+          minimum: 0
+          multipleOf: 0.01
+          description: Non-negative amount, up to two decimals and within safe integer cents.
+        type:
+          type: string
+          enum:
+            - Dr
+            - Cr
+      required:
+        - amount
+        - type
+      description: >-
+        Original opening at company Books From, not a later selected FY. Dr emits negative XML, Cr positive. Zero
+        has no financial direction. No opening bill references are created.
     LedgerCreateResponse:
       type: object
       properties:
-        success: { type: boolean, example: true }
-        code: { type: integer, example: 1000 }
-        type: { type: string, example: OK }
-        message: { type: string }
-        request_id: { type: string, format: uuid }
-        status: { type: string, example: succeeded }
-        duplicate: { type: boolean }
-        transaction_type: { type: string, enum: [ledger_create] }
+        success:
+          type: boolean
+          example: true
+        code:
+          type: integer
+          example: 1000
+        type:
+          type: string
+          example: OK
+        message:
+          type: string
+        request_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          example: succeeded
+        duplicate:
+          type: boolean
+        transaction_type:
+          type: string
+          enum:
+            - ledger_create
         ledger:
           type: object
           properties:
-            company_id: { type: string, example: "02" }
-            name: { type: string }
-            parent: { type: string }
-            dealer_code: { type: string }
-            bill_wise: { type: boolean }
-            master_id: { type: string }
-            guid: { type: string }
+            company_id:
+              type: string
+              example: "02"
+            name:
+              type: string
+            parent:
+              type: string
+            dealer_code:
+              type: string
+            bill_wise:
+              type: boolean
+            master_id:
+              type: string
+            guid:
+              type: string
+            alias:
+              type: string
+              maxLength: 255
+              description: Optional alias, checked against names and aliases within the selected company.
+            description:
+              type: string
+              maxLength: 1000
+            credit_details:
+              $ref: "#/components/schemas/LedgerCreditDetails"
+            mailing_details:
+              $ref: "#/components/schemas/LedgerMailingDetails"
+            tax_details:
+              $ref: "#/components/schemas/LedgerTaxDetails"
+            bank_details:
+              $ref: "#/components/schemas/LedgerBankDetails"
+            opening_balance:
+              $ref: "#/components/schemas/LedgerOpeningBalance"
         tally_result:
           type: object
           properties:
-            verified: { type: boolean }
+            verified:
+              type: boolean
             created:
               type: boolean
               nullable: true
-              description: true only with an accepted creation summary; null when existence was verified after an uncertain response.
-            recovered: { type: boolean }
+              description: >-
+                true only with an accepted creation summary; null when existence was verified after an uncertain
+                response.
+            recovered:
+              type: boolean
             outcome:
               type: string
-              enum: [created_and_verified, verified_after_uncertain_import]
+              enum:
+                - created_and_verified
+                - verified_after_uncertain_import
             import_result:
               type: object
               nullable: true
@@ -2567,7 +2771,10 @@ components:
               properties:
                 status:
                   type: string
-                  enum: [queued, pending, initial_sync_required]
+                  enum:
+                    - queued
+                    - pending
+                    - initial_sync_required
     MovementAnalysisRequest:
       type: object
       required:

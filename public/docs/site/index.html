@@ -4340,7 +4340,7 @@ print(response.status_code, result)</code></pre></div></div></div><h4>Responses<
   &quot;code&quot;: 2004,
   &quot;type&quot;: &quot;NOT_FOUND&quot;,
   &quot;message&quot;: &quot;Sales order request not found.&quot;
-}</code></pre></div></div></details></div><a class="endpoint-permalink" href="#op-getpaymentvoucherstatus">Link to this endpoint ↗</a></div></details></section><section class="endpoint-group" id="group-ledger-creation"><div class="group-header"><div><p class="section-kicker">API reference</p><h2>Ledger Creation <span class="count">2 endpoints</span></h2><p class="group-description">Create a ledger in an open Tally company, verify its identity, and read creation status.</p></div></div><details class="endpoint" id="op-createledger" data-search="post /api/v1/ledgers/create create and verify one ledger in tally requires connector 0.2.4 or newer, an open client-scoped company and an existing parent group. this is create-only, with no opening balance, gst or address fields in this version. names and non-empty dealer codes are checked within the selected company. dealer_code is mapped to tally narration. the response waits for import and read-back verification. reuse idempotency_key only for the same company and payload. a durable server claim and connector journal prevent an automatic second import after an uncertain response or reinstall. repeating an uncertain request performs read-back verification only. creation may already have completed when http 409 reports ledger_create_outcome_unknown. http 504 means poll status. cache queue failure does not turn verified tally creation into a failed import. ledger creation    idempotency_key  string  required   required non-blank retry key. reuse only with the same company and normalized payload. maximum 200 characters.      destination  object  required   see the request example.      destination.company_id  string  required   client company id from get /api/v1/companies. the company must be open.      ledger  object  required   see the request example.      ledger.name  string  required   ledger name. leading/trailing whitespace is removed; xml/control characters are validated. maximum 255 characters.      ledger.parent  string  required   existing tally accounting group. the api never creates or substitutes a group automatically. maximum 255 characters.      ledger.dealer_code  string   optional code mapped to tally narration. a non-empty code must be unused in the selected company. default: &amp;quot;&amp;quot;. maximum 200 characters.      ledger.bill_wise  boolean   sets maintain balances bill-by-bill. does not import opening bills. default: false.  "><summary><span class="method post">POST</span><code class="endpoint-path">/api/v1/ledgers/create</code><span class="endpoint-summary">Create and verify one ledger in Tally</span><span class="endpoint-chevron" aria-hidden="true">⌄</span></summary><div class="endpoint-body"><div class="endpoint-grid"><div class="endpoint-description"><div class="auth-note client">Client authentication · X-Client-ID + X-API-Key</div><p>Requires Connector 0.2.4 or newer, an open client-scoped company and an existing parent group. This is create-only, with no opening balance, GST or address fields in this version. Names and non-empty dealer codes are checked within the selected company. dealer_code is mapped to Tally Narration. The response waits for import and read-back verification. Reuse idempotency_key only for the same company and payload. A durable Server claim and Connector journal prevent an automatic second import after an uncertain response or reinstall. Repeating an uncertain request performs read-back verification only. Creation may already have completed when HTTP 409 reports LEDGER_CREATE_OUTCOME_UNKNOWN. HTTP 504 means poll status. Cache queue failure does not turn verified Tally creation into a failed import.</p><h4>Request body <span class="field-type">application/json</span></h4><div class="field-list"><div class="field"><div class="field-meta"><code class="field-name">idempotency_key</code><span class="field-type">string</span><span class="required">required</span></div><div class="field-description">Required non-blank retry key. Reuse only with the same company and normalized payload. Maximum 200 characters.</div></div><div class="field"><div class="field-meta"><code class="field-name">destination</code><span class="field-type">object</span><span class="required">required</span></div><div class="field-description">See the request example.</div></div><div class="field"><div class="field-meta"><code class="field-name">destination.company_id</code><span class="field-type">string</span><span class="required">required</span></div><div class="field-description">Client company ID from GET /api/v1/companies. The company must be open.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger</code><span class="field-type">object</span><span class="required">required</span></div><div class="field-description">See the request example.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.name</code><span class="field-type">string</span><span class="required">required</span></div><div class="field-description">Ledger name. Leading/trailing whitespace is removed; XML/control characters are validated. Maximum 255 characters.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.parent</code><span class="field-type">string</span><span class="required">required</span></div><div class="field-description">Existing Tally accounting group. The API never creates or substitutes a group automatically. Maximum 255 characters.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.dealer_code</code><span class="field-type">string</span></div><div class="field-description">Optional code mapped to Tally Narration. A non-empty code must be unused in the selected company. Default: &quot;&quot;. Maximum 200 characters.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.bill_wise</code><span class="field-type">boolean</span></div><div class="field-description">Sets Maintain balances bill-by-bill. Does not import opening bills. Default: false.</div></div></div></div><div class="examples"><div class="code-panel"><div class="code-heading"><div class="code-tabs" role="tablist" aria-label="Create and verify one ledger in Tally request language"><button type="button" role="tab" class="code-tab" id="op-createledger-tab-0" aria-controls="op-createledger-code-0" aria-selected="true" tabindex="0">cURL</button><button type="button" role="tab" class="code-tab" id="op-createledger-tab-1" aria-controls="op-createledger-code-1" aria-selected="false" tabindex="-1">JavaScript</button><button type="button" role="tab" class="code-tab" id="op-createledger-tab-2" aria-controls="op-createledger-code-2" aria-selected="false" tabindex="-1">Python</button></div><button type="button" class="copy-button" aria-label="Copy code"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h4"/></svg><span>Copy</span></button></div><pre role="tabpanel" tabindex="0" id="op-createledger-code-0" aria-labelledby="op-createledger-tab-0"><code>curl --request POST &#39;https://sync.flowups.in/api/v1/ledgers/create&#39; \
+}</code></pre></div></div></details></div><a class="endpoint-permalink" href="#op-getpaymentvoucherstatus">Link to this endpoint ↗</a></div></details></section><section class="endpoint-group" id="group-ledger-creation"><div class="group-header"><div><p class="section-kicker">API reference</p><h2>Ledger Creation <span class="count">2 endpoints</span></h2><p class="group-description">Create a ledger in an open Tally company, verify its identity, and read creation status.</p></div></div><details class="endpoint" id="op-createledger" data-search="post /api/v1/ledgers/create create and verify one ledger in tally requires connector 0.2.5 or newer, an open client-scoped company and an existing parent group. this is create-only and supports alias, description, credit, mailing, tax, party banking and opening details. opening and dated mailing/gst entries use company books from, not a later financial-year opening. names and non-empty dealer codes are checked within the selected company. dealer_code is mapped to tally narration. the response waits for import and read-back verification. reuse idempotency_key only for the same company and payload. a durable server claim and connector journal prevent an automatic second import after an uncertain response or reinstall. repeating an uncertain request performs read-back verification only. creation may already have completed when http 409 reports ledger_create_outcome_unknown. http 504 means poll status. cache queue failure does not turn verified tally creation into a failed import. ledger creation    idempotency_key  string  required   required non-blank retry key. reuse only with the same company and normalized payload. maximum 200 characters.      destination  object  required   see the request example.      destination.company_id  string  required   client company id from get /api/v1/companies. the company must be open.      ledger  object  required   see the request example.      ledger.name  string  required   ledger name. leading/trailing whitespace is removed; xml/control characters are validated. maximum 255 characters.      ledger.parent  string  required   existing tally accounting group. the api never creates or substitutes a group automatically. maximum 255 characters.      ledger.dealer_code  string   optional code mapped to tally narration. a non-empty code must be unused in the selected company. default: &amp;quot;&amp;quot;. maximum 200 characters.      ledger.bill_wise  boolean   sets maintain balances bill-by-bill. does not import opening bills. default: false.      ledger.alias  string   optional alias, checked against names and aliases within the selected company. maximum 255 characters.      ledger.description  string   maximum 1000 characters.      ledger.credit_details  object   see the request example.      ledger.credit_details.default_credit_period_days  integer   minimum: 0.      ledger.credit_details.check_credit_days_during_voucher_entry  boolean   see the request example.      ledger.mailing_details  object   dated mailing details start at the selected company books from date. country/state values remain subject to native tally validation.      ledger.mailing_details.name  string   maximum 255 characters.      ledger.mailing_details.address  array   see the request example.      ledger.mailing_details.state  string   maximum 255 characters.      ledger.mailing_details.country  string   maximum 255 characters.      ledger.mailing_details.pincode  string   maximum 20 characters.      ledger.tax_details  object   prime 3+ gst registration entries start at the selected company books from date.      ledger.tax_details.pan  string   pan or empty string; trimmed and uppercased. syntax is checked, not registration status. maximum 10 characters.      ledger.tax_details.registration_type  string   unregistered normalizes to unregistered/consumer. allowed: &amp;quot;regular&amp;quot;, &amp;quot;composition&amp;quot;, &amp;quot;unregistered&amp;quot;, &amp;quot;unregistered/consumer&amp;quot;, &amp;quot;consumer&amp;quot;, &amp;quot;unknown&amp;quot;.      ledger.tax_details.gstin  string   gstin or empty string; trimmed/uppercased. must contain the supplied pan when both are supplied. maximum 15 characters.      ledger.bank_details  object   one default party payment account. omit or send null for no banking details; not a bank accounts ledger or multiple accounts.      ledger.bank_details.account_holder_name  string  required   maximum 255 characters. required when its parent object is supplied.      ledger.bank_details.bank_name  string  required   maximum 255 characters. required when its parent object is supplied.      ledger.bank_details.branch  string   maximum 255 characters.      ledger.bank_details.account_number  string  required   string to preserve leading zeros. maximum 40 characters. required when its parent object is supplied.      ledger.bank_details.ifsc_code  string   11-character ifsc or empty string; uppercased and syntax checked. maximum 11 characters.      ledger.opening_balance  object   original opening at company books from, not a later selected fy. dr emits negative xml, cr positive. zero has no financial direction. no opening bill references are created.      ledger.opening_balance.amount  number  required   non-negative amount, up to two decimals and within safe integer cents. minimum: 0. required when its parent object is supplied.      ledger.opening_balance.type  string  required   allowed: &amp;quot;dr&amp;quot;, &amp;quot;cr&amp;quot;. required when its parent object is supplied.  "><summary><span class="method post">POST</span><code class="endpoint-path">/api/v1/ledgers/create</code><span class="endpoint-summary">Create and verify one ledger in Tally</span><span class="endpoint-chevron" aria-hidden="true">⌄</span></summary><div class="endpoint-body"><div class="endpoint-grid"><div class="endpoint-description"><div class="auth-note client">Client authentication · X-Client-ID + X-API-Key</div><p>Requires Connector 0.2.5 or newer, an open client-scoped company and an existing parent group. This is create-only and supports alias, description, credit, mailing, tax, party banking and opening details. Opening and dated mailing/GST entries use company Books From, not a later financial-year opening. Names and non-empty dealer codes are checked within the selected company. dealer_code is mapped to Tally Narration. The response waits for import and read-back verification. Reuse idempotency_key only for the same company and payload. A durable Server claim and Connector journal prevent an automatic second import after an uncertain response or reinstall. Repeating an uncertain request performs read-back verification only. Creation may already have completed when HTTP 409 reports LEDGER_CREATE_OUTCOME_UNKNOWN. HTTP 504 means poll status. Cache queue failure does not turn verified Tally creation into a failed import.</p><h4>Request body <span class="field-type">application/json</span></h4><div class="field-list"><div class="field"><div class="field-meta"><code class="field-name">idempotency_key</code><span class="field-type">string</span><span class="required">required</span></div><div class="field-description">Required non-blank retry key. Reuse only with the same company and normalized payload. Maximum 200 characters.</div></div><div class="field"><div class="field-meta"><code class="field-name">destination</code><span class="field-type">object</span><span class="required">required</span></div><div class="field-description">See the request example.</div></div><div class="field"><div class="field-meta"><code class="field-name">destination.company_id</code><span class="field-type">string</span><span class="required">required</span></div><div class="field-description">Client company ID from GET /api/v1/companies. The company must be open.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger</code><span class="field-type">object</span><span class="required">required</span></div><div class="field-description">See the request example.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.name</code><span class="field-type">string</span><span class="required">required</span></div><div class="field-description">Ledger name. Leading/trailing whitespace is removed; XML/control characters are validated. Maximum 255 characters.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.parent</code><span class="field-type">string</span><span class="required">required</span></div><div class="field-description">Existing Tally accounting group. The API never creates or substitutes a group automatically. Maximum 255 characters.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.dealer_code</code><span class="field-type">string</span></div><div class="field-description">Optional code mapped to Tally Narration. A non-empty code must be unused in the selected company. Default: &quot;&quot;. Maximum 200 characters.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.bill_wise</code><span class="field-type">boolean</span></div><div class="field-description">Sets Maintain balances bill-by-bill. Does not import opening bills. Default: false.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.alias</code><span class="field-type">string</span></div><div class="field-description">Optional alias, checked against names and aliases within the selected company. Maximum 255 characters.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.description</code><span class="field-type">string</span></div><div class="field-description">Maximum 1000 characters.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.credit_details</code><span class="field-type">object</span></div><div class="field-description">See the request example.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.credit_details.default_credit_period_days</code><span class="field-type">integer</span></div><div class="field-description">Minimum: 0.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.credit_details.check_credit_days_during_voucher_entry</code><span class="field-type">boolean</span></div><div class="field-description">See the request example.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.mailing_details</code><span class="field-type">object</span></div><div class="field-description">Dated mailing details start at the selected company Books From date. Country/state values remain subject to native Tally validation.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.mailing_details.name</code><span class="field-type">string</span></div><div class="field-description">Maximum 255 characters.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.mailing_details.address</code><span class="field-type">array</span></div><div class="field-description">See the request example.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.mailing_details.state</code><span class="field-type">string</span></div><div class="field-description">Maximum 255 characters.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.mailing_details.country</code><span class="field-type">string</span></div><div class="field-description">Maximum 255 characters.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.mailing_details.pincode</code><span class="field-type">string</span></div><div class="field-description">Maximum 20 characters.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.tax_details</code><span class="field-type">object</span></div><div class="field-description">Prime 3+ GST registration entries start at the selected company Books From date.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.tax_details.pan</code><span class="field-type">string</span></div><div class="field-description">PAN or empty string; trimmed and uppercased. Syntax is checked, not registration status. Maximum 10 characters.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.tax_details.registration_type</code><span class="field-type">string</span></div><div class="field-description">Unregistered normalizes to Unregistered/Consumer. Allowed: &quot;Regular&quot;, &quot;Composition&quot;, &quot;Unregistered&quot;, &quot;Unregistered/Consumer&quot;, &quot;Consumer&quot;, &quot;Unknown&quot;.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.tax_details.gstin</code><span class="field-type">string</span></div><div class="field-description">GSTIN or empty string; trimmed/uppercased. Must contain the supplied PAN when both are supplied. Maximum 15 characters.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.bank_details</code><span class="field-type">object</span></div><div class="field-description">One default party payment account. Omit or send null for no banking details; not a Bank Accounts ledger or multiple accounts.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.bank_details.account_holder_name</code><span class="field-type">string</span><span class="required">required</span></div><div class="field-description">Maximum 255 characters. Required when its parent object is supplied.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.bank_details.bank_name</code><span class="field-type">string</span><span class="required">required</span></div><div class="field-description">Maximum 255 characters. Required when its parent object is supplied.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.bank_details.branch</code><span class="field-type">string</span></div><div class="field-description">Maximum 255 characters.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.bank_details.account_number</code><span class="field-type">string</span><span class="required">required</span></div><div class="field-description">String to preserve leading zeros. Maximum 40 characters. Required when its parent object is supplied.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.bank_details.ifsc_code</code><span class="field-type">string</span></div><div class="field-description">11-character IFSC or empty string; uppercased and syntax checked. Maximum 11 characters.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.opening_balance</code><span class="field-type">object</span></div><div class="field-description">Original opening at company Books From, not a later selected FY. Dr emits negative XML, Cr positive. Zero has no financial direction. No opening bill references are created.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.opening_balance.amount</code><span class="field-type">number</span><span class="required">required</span></div><div class="field-description">Non-negative amount, up to two decimals and within safe integer cents. Minimum: 0. Required when its parent object is supplied.</div></div><div class="field"><div class="field-meta"><code class="field-name">ledger.opening_balance.type</code><span class="field-type">string</span><span class="required">required</span></div><div class="field-description">Allowed: &quot;Dr&quot;, &quot;Cr&quot;. Required when its parent object is supplied.</div></div></div></div><div class="examples"><div class="code-panel"><div class="code-heading"><div class="code-tabs" role="tablist" aria-label="Create and verify one ledger in Tally request language"><button type="button" role="tab" class="code-tab" id="op-createledger-tab-0" aria-controls="op-createledger-code-0" aria-selected="true" tabindex="0">cURL</button><button type="button" role="tab" class="code-tab" id="op-createledger-tab-1" aria-controls="op-createledger-code-1" aria-selected="false" tabindex="-1">JavaScript</button><button type="button" role="tab" class="code-tab" id="op-createledger-tab-2" aria-controls="op-createledger-code-2" aria-selected="false" tabindex="-1">Python</button></div><button type="button" class="copy-button" aria-label="Copy code"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h4"/></svg><span>Copy</span></button></div><pre role="tabpanel" tabindex="0" id="op-createledger-code-0" aria-labelledby="op-createledger-tab-0"><code>curl --request POST &#39;https://sync.flowups.in/api/v1/ledgers/create&#39; \
   --header &quot;X-Client-ID: $CLIENT_ID&quot; \
   --header &quot;X-API-Key: $API_KEY&quot; \
   --header &quot;Content-Type: application/json&quot; \
@@ -4353,7 +4353,34 @@ print(response.status_code, result)</code></pre></div></div></div><h4>Responses<
     &quot;name&quot;: &quot;ABC Traders&quot;,
     &quot;parent&quot;: &quot;Sundry Debtors&quot;,
     &quot;dealer_code&quot;: &quot;AH0003&quot;,
-    &quot;bill_wise&quot;: true
+    &quot;bill_wise&quot;: true,
+    &quot;alias&quot;: &quot;ABC-CUSTOMER&quot;,
+    &quot;description&quot;: &quot;Customer ledger&quot;,
+    &quot;credit_details&quot;: {
+      &quot;default_credit_period_days&quot;: 30,
+      &quot;check_credit_days_during_voucher_entry&quot;: true
+    },
+    &quot;mailing_details&quot;: {
+      &quot;name&quot;: &quot;ABC Traders&quot;,
+      &quot;address&quot;: [
+        &quot;Shop No. 10&quot;,
+        &quot;Sample Road&quot;,
+        &quot;Pune&quot;
+      ],
+      &quot;state&quot;: &quot;Maharashtra&quot;,
+      &quot;country&quot;: &quot;India&quot;,
+      &quot;pincode&quot;: &quot;411001&quot;
+    },
+    &quot;tax_details&quot;: {
+      &quot;pan&quot;: &quot;&quot;,
+      &quot;registration_type&quot;: &quot;Unregistered/Consumer&quot;,
+      &quot;gstin&quot;: &quot;&quot;
+    },
+    &quot;bank_details&quot;: null,
+    &quot;opening_balance&quot;: {
+      &quot;amount&quot;: 0,
+      &quot;type&quot;: &quot;Dr&quot;
+    }
   }
 }&#39;</code></pre><pre role="tabpanel" tabindex="0" id="op-createledger-code-1" aria-labelledby="op-createledger-tab-1" hidden><code>const response = await fetch(&quot;https://sync.flowups.in/api/v1/ledgers/create&quot;, {
   method: &#39;POST&#39;,
@@ -4371,7 +4398,34 @@ print(response.status_code, result)</code></pre></div></div></div><h4>Responses<
       &quot;name&quot;: &quot;ABC Traders&quot;,
       &quot;parent&quot;: &quot;Sundry Debtors&quot;,
       &quot;dealer_code&quot;: &quot;AH0003&quot;,
-      &quot;bill_wise&quot;: true
+      &quot;bill_wise&quot;: true,
+      &quot;alias&quot;: &quot;ABC-CUSTOMER&quot;,
+      &quot;description&quot;: &quot;Customer ledger&quot;,
+      &quot;credit_details&quot;: {
+        &quot;default_credit_period_days&quot;: 30,
+        &quot;check_credit_days_during_voucher_entry&quot;: true
+      },
+      &quot;mailing_details&quot;: {
+        &quot;name&quot;: &quot;ABC Traders&quot;,
+        &quot;address&quot;: [
+          &quot;Shop No. 10&quot;,
+          &quot;Sample Road&quot;,
+          &quot;Pune&quot;
+        ],
+        &quot;state&quot;: &quot;Maharashtra&quot;,
+        &quot;country&quot;: &quot;India&quot;,
+        &quot;pincode&quot;: &quot;411001&quot;
+      },
+      &quot;tax_details&quot;: {
+        &quot;pan&quot;: &quot;&quot;,
+        &quot;registration_type&quot;: &quot;Unregistered/Consumer&quot;,
+        &quot;gstin&quot;: &quot;&quot;
+      },
+      &quot;bank_details&quot;: null,
+      &quot;opening_balance&quot;: {
+        &quot;amount&quot;: 0,
+        &quot;type&quot;: &quot;Dr&quot;
+      }
     }
   })
 });
@@ -4394,7 +4448,34 @@ payload = json.loads(r&#39;&#39;&#39;{
     &quot;name&quot;: &quot;ABC Traders&quot;,
     &quot;parent&quot;: &quot;Sundry Debtors&quot;,
     &quot;dealer_code&quot;: &quot;AH0003&quot;,
-    &quot;bill_wise&quot;: true
+    &quot;bill_wise&quot;: true,
+    &quot;alias&quot;: &quot;ABC-CUSTOMER&quot;,
+    &quot;description&quot;: &quot;Customer ledger&quot;,
+    &quot;credit_details&quot;: {
+      &quot;default_credit_period_days&quot;: 30,
+      &quot;check_credit_days_during_voucher_entry&quot;: true
+    },
+    &quot;mailing_details&quot;: {
+      &quot;name&quot;: &quot;ABC Traders&quot;,
+      &quot;address&quot;: [
+        &quot;Shop No. 10&quot;,
+        &quot;Sample Road&quot;,
+        &quot;Pune&quot;
+      ],
+      &quot;state&quot;: &quot;Maharashtra&quot;,
+      &quot;country&quot;: &quot;India&quot;,
+      &quot;pincode&quot;: &quot;411001&quot;
+    },
+    &quot;tax_details&quot;: {
+      &quot;pan&quot;: &quot;&quot;,
+      &quot;registration_type&quot;: &quot;Unregistered/Consumer&quot;,
+      &quot;gstin&quot;: &quot;&quot;
+    },
+    &quot;bank_details&quot;: null,
+    &quot;opening_balance&quot;: {
+      &quot;amount&quot;: 0,
+      &quot;type&quot;: &quot;Dr&quot;
+    }
   }
 }&#39;&#39;&#39;)
 
@@ -4422,9 +4503,36 @@ print(response.status_code, result)</code></pre></div><div class="code-panel"><d
     &quot;name&quot;: &quot;ABC Traders&quot;,
     &quot;parent&quot;: &quot;Sundry Debtors&quot;,
     &quot;dealer_code&quot;: &quot;AH0003&quot;,
-    &quot;bill_wise&quot;: true
+    &quot;bill_wise&quot;: true,
+    &quot;alias&quot;: &quot;ABC-CUSTOMER&quot;,
+    &quot;description&quot;: &quot;Customer ledger&quot;,
+    &quot;credit_details&quot;: {
+      &quot;default_credit_period_days&quot;: 30,
+      &quot;check_credit_days_during_voucher_entry&quot;: true
+    },
+    &quot;mailing_details&quot;: {
+      &quot;name&quot;: &quot;ABC Traders&quot;,
+      &quot;address&quot;: [
+        &quot;Shop No. 10&quot;,
+        &quot;Sample Road&quot;,
+        &quot;Pune&quot;
+      ],
+      &quot;state&quot;: &quot;Maharashtra&quot;,
+      &quot;country&quot;: &quot;India&quot;,
+      &quot;pincode&quot;: &quot;411001&quot;
+    },
+    &quot;tax_details&quot;: {
+      &quot;pan&quot;: &quot;&quot;,
+      &quot;registration_type&quot;: &quot;Unregistered/Consumer&quot;,
+      &quot;gstin&quot;: &quot;&quot;
+    },
+    &quot;bank_details&quot;: null,
+    &quot;opening_balance&quot;: {
+      &quot;amount&quot;: 0,
+      &quot;type&quot;: &quot;Dr&quot;
+    }
   }
-}</code></pre></div></div></div><h4>Responses</h4><div class="response-list"><details class="response"><summary><span class="http-code ok">200</span><span class="response-description">The requested ledger was read back and verified in Tally. Cache update may still be queued.</span></summary><div class="response-body"><p class="muted">This response uses the description above; no fixed response example is specified.</p></div></details><details class="response"><summary><span class="http-code ">400</span><span class="response-description">Invalid or unsupported fields, including opening balance or GST fields in this version.</span></summary><div class="response-body"><p class="muted">This response uses the description above; no fixed response example is specified.</p></div></details><details class="response"><summary><span class="http-code ">401</span><span class="response-description">Invalid client credentials.</span></summary><div class="response-body"><p class="muted">This response uses the description above; no fixed response example is specified.</p></div></details><details class="response"><summary><span class="http-code ">404</span><span class="response-description">Company or request not found for this client.</span></summary><div class="response-body"><p class="muted">This response uses the description above; no fixed response example is specified.</p></div></details><details class="response"><summary><span class="http-code ">409</span><span class="response-description">Duplicate name/code, unknown parent, idempotency conflict, Tally rejection or uncertain creation outcome. Inspect error_code and tally_result; do not blindly create with a new key.</span></summary><div class="response-body"><p class="muted">This response uses the description above; no fixed response example is specified.</p></div></details><details class="response"><summary><span class="http-code ">502</span><span class="response-description">Invalid or incomplete upstream Tally result.</span></summary><div class="response-body"><p class="muted">This response uses the description above; no fixed response example is specified.</p></div></details><details class="response"><summary><span class="http-code ">503</span><span class="response-description">Connector/Tally unavailable, local creation storage unavailable, or a local sync holds Tally busy.</span></summary><div class="response-body"><p class="muted">This response uses the description above; no fixed response example is specified.</p></div></details><details class="response"><summary><span class="http-code ">504</span><span class="response-description">Response deadline expired. Use request_id to read status before retrying.</span></summary><div class="response-body"><p class="muted">This response uses the description above; no fixed response example is specified.</p></div></details></div><a class="endpoint-permalink" href="#op-createledger">Link to this endpoint ↗</a></div></details><details class="endpoint" id="op-getledgercreatestatus" data-search="get /api/v1/ledgers/create/{requestid}/status read a ledger creation request and its verified result client-scoped status read. does not require an online connector and does not itself import or retry anything. ledger creation "><summary><span class="method get">GET</span><code class="endpoint-path">/api/v1/ledgers/create/{requestId}/status</code><span class="endpoint-summary">Read a ledger creation request and its verified result</span><span class="endpoint-chevron" aria-hidden="true">⌄</span></summary><div class="endpoint-body"><div class="endpoint-grid"><div class="endpoint-description"><div class="auth-note client">Client authentication · X-Client-ID + X-API-Key</div><p>Client-scoped status read. Does not require an online Connector and does not itself import or retry anything.</p><h4>Parameters</h4><div class="field-list"><div class="field"><div class="field-meta"><code class="field-name">requestId</code><span class="field-type">path · string</span><span class="required">required</span></div><div class="field-description">Request ID returned by the push endpoint.</div></div></div></div><div class="examples"><div class="code-panel"><div class="code-heading"><div class="code-tabs" role="tablist" aria-label="Read a ledger creation request and its verified result request language"><button type="button" role="tab" class="code-tab" id="op-getledgercreatestatus-tab-0" aria-controls="op-getledgercreatestatus-code-0" aria-selected="true" tabindex="0">cURL</button><button type="button" role="tab" class="code-tab" id="op-getledgercreatestatus-tab-1" aria-controls="op-getledgercreatestatus-code-1" aria-selected="false" tabindex="-1">JavaScript</button><button type="button" role="tab" class="code-tab" id="op-getledgercreatestatus-tab-2" aria-controls="op-getledgercreatestatus-code-2" aria-selected="false" tabindex="-1">Python</button></div><button type="button" class="copy-button" aria-label="Copy code"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h4"/></svg><span>Copy</span></button></div><pre role="tabpanel" tabindex="0" id="op-getledgercreatestatus-code-0" aria-labelledby="op-getledgercreatestatus-tab-0"><code>curl --request GET &#39;https://sync.flowups.in/api/v1/ledgers/create/18771bcc-5374-4c11-8e43-0b930659de08/status&#39; \
+}</code></pre></div></div></div><h4>Responses</h4><div class="response-list"><details class="response"><summary><span class="http-code ok">200</span><span class="response-description">The requested ledger was read back and verified in Tally. Cache update may still be queued.</span></summary><div class="response-body"><p class="muted">This response uses the description above; no fixed response example is specified.</p></div></details><details class="response"><summary><span class="http-code ">400</span><span class="response-description">Invalid, malformed or unsupported fields. Nested errors identify the precise ledger field.</span></summary><div class="response-body"><p class="muted">This response uses the description above; no fixed response example is specified.</p></div></details><details class="response"><summary><span class="http-code ">401</span><span class="response-description">Invalid client credentials.</span></summary><div class="response-body"><p class="muted">This response uses the description above; no fixed response example is specified.</p></div></details><details class="response"><summary><span class="http-code ">404</span><span class="response-description">Company or request not found for this client.</span></summary><div class="response-body"><p class="muted">This response uses the description above; no fixed response example is specified.</p></div></details><details class="response"><summary><span class="http-code ">409</span><span class="response-description">Duplicate name/code, unknown parent, idempotency conflict, Tally rejection or uncertain creation outcome. Inspect error_code and tally_result; do not blindly create with a new key.</span></summary><div class="response-body"><p class="muted">This response uses the description above; no fixed response example is specified.</p></div></details><details class="response"><summary><span class="http-code ">502</span><span class="response-description">Invalid or incomplete upstream Tally result.</span></summary><div class="response-body"><p class="muted">This response uses the description above; no fixed response example is specified.</p></div></details><details class="response"><summary><span class="http-code ">503</span><span class="response-description">Connector/Tally unavailable, local creation storage unavailable, or a local sync holds Tally busy.</span></summary><div class="response-body"><p class="muted">This response uses the description above; no fixed response example is specified.</p></div></details><details class="response"><summary><span class="http-code ">504</span><span class="response-description">Response deadline expired. Use request_id to read status before retrying.</span></summary><div class="response-body"><p class="muted">This response uses the description above; no fixed response example is specified.</p></div></details></div><a class="endpoint-permalink" href="#op-createledger">Link to this endpoint ↗</a></div></details><details class="endpoint" id="op-getledgercreatestatus" data-search="get /api/v1/ledgers/create/{requestid}/status read a ledger creation request and its verified result client-scoped status read. does not require an online connector and does not itself import or retry anything. ledger creation "><summary><span class="method get">GET</span><code class="endpoint-path">/api/v1/ledgers/create/{requestId}/status</code><span class="endpoint-summary">Read a ledger creation request and its verified result</span><span class="endpoint-chevron" aria-hidden="true">⌄</span></summary><div class="endpoint-body"><div class="endpoint-grid"><div class="endpoint-description"><div class="auth-note client">Client authentication · X-Client-ID + X-API-Key</div><p>Client-scoped status read. Does not require an online Connector and does not itself import or retry anything.</p><h4>Parameters</h4><div class="field-list"><div class="field"><div class="field-meta"><code class="field-name">requestId</code><span class="field-type">path · string</span><span class="required">required</span></div><div class="field-description">Request ID returned by the push endpoint.</div></div></div></div><div class="examples"><div class="code-panel"><div class="code-heading"><div class="code-tabs" role="tablist" aria-label="Read a ledger creation request and its verified result request language"><button type="button" role="tab" class="code-tab" id="op-getledgercreatestatus-tab-0" aria-controls="op-getledgercreatestatus-code-0" aria-selected="true" tabindex="0">cURL</button><button type="button" role="tab" class="code-tab" id="op-getledgercreatestatus-tab-1" aria-controls="op-getledgercreatestatus-code-1" aria-selected="false" tabindex="-1">JavaScript</button><button type="button" role="tab" class="code-tab" id="op-getledgercreatestatus-tab-2" aria-controls="op-getledgercreatestatus-code-2" aria-selected="false" tabindex="-1">Python</button></div><button type="button" class="copy-button" aria-label="Copy code"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h4"/></svg><span>Copy</span></button></div><pre role="tabpanel" tabindex="0" id="op-getledgercreatestatus-code-0" aria-labelledby="op-getledgercreatestatus-tab-0"><code>curl --request GET &#39;https://sync.flowups.in/api/v1/ledgers/create/18771bcc-5374-4c11-8e43-0b930659de08/status&#39; \
   --header &quot;X-Client-ID: $CLIENT_ID&quot; \
   --header &quot;X-API-Key: $API_KEY&quot;</code></pre><pre role="tabpanel" tabindex="0" id="op-getledgercreatestatus-code-1" aria-labelledby="op-getledgercreatestatus-tab-1" hidden><code>const response = await fetch(&quot;https://sync.flowups.in/api/v1/ledgers/create/18771bcc-5374-4c11-8e43-0b930659de08/status&quot;, {
   method: &#39;GET&#39;,
@@ -4974,7 +5082,7 @@ print(response.status_code, result)</code></pre></div></div></div><h4>Responses<
         ],
         "operationId": "createLedger",
         "summary": "Create and verify one ledger in Tally",
-        "description": "Requires Connector 0.2.4 or newer, an open client-scoped company and an existing parent group. This is create-only, with no opening balance, GST or address fields in this version. Names and non-empty dealer codes are checked within the selected company. dealer_code is mapped to Tally Narration. The response waits for import and read-back verification. Reuse idempotency_key only for the same company and payload. A durable Server claim and Connector journal prevent an automatic second import after an uncertain response or reinstall. Repeating an uncertain request performs read-back verification only. Creation may already have completed when HTTP 409 reports LEDGER_CREATE_OUTCOME_UNKNOWN. HTTP 504 means poll status. Cache queue failure does not turn verified Tally creation into a failed import.",
+        "description": "Requires Connector 0.2.5 or newer, an open client-scoped company and an existing parent group. This is create-only and supports alias, description, credit, mailing, tax, party banking and opening details. Opening and dated mailing/GST entries use company Books From, not a later financial-year opening. Names and non-empty dealer codes are checked within the selected company. dealer_code is mapped to Tally Narration. The response waits for import and read-back verification. Reuse idempotency_key only for the same company and payload. A durable Server claim and Connector journal prevent an automatic second import after an uncertain response or reinstall. Repeating an uncertain request performs read-back verification only. Creation may already have completed when HTTP 409 reports LEDGER_CREATE_OUTCOME_UNKNOWN. HTTP 504 means poll status. Cache queue failure does not turn verified Tally creation into a failed import.",
         "security": [
           {
             "clientId": [],
@@ -4997,7 +5105,34 @@ print(response.status_code, result)</code></pre></div></div></div><h4>Responses<
                   "name": "ABC Traders",
                   "parent": "Sundry Debtors",
                   "dealer_code": "AH0003",
-                  "bill_wise": true
+                  "bill_wise": true,
+                  "alias": "ABC-CUSTOMER",
+                  "description": "Customer ledger",
+                  "credit_details": {
+                    "default_credit_period_days": 30,
+                    "check_credit_days_during_voucher_entry": true
+                  },
+                  "mailing_details": {
+                    "name": "ABC Traders",
+                    "address": [
+                      "Shop No. 10",
+                      "Sample Road",
+                      "Pune"
+                    ],
+                    "state": "Maharashtra",
+                    "country": "India",
+                    "pincode": "411001"
+                  },
+                  "tax_details": {
+                    "pan": "",
+                    "registration_type": "Unregistered/Consumer",
+                    "gstin": ""
+                  },
+                  "bank_details": null,
+                  "opening_balance": {
+                    "amount": 0,
+                    "type": "Dr"
+                  }
                 }
               }
             }
@@ -5015,7 +5150,7 @@ print(response.status_code, result)</code></pre></div></div></div><h4>Responses<
             }
           },
           "400": {
-            "description": "Invalid or unsupported fields, including opening balance or GST fields in this version.",
+            "description": "Invalid, malformed or unsupported fields. Nested errors identify the precise ledger field.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7284,8 +7419,174 @@ print(response.status_code, result)</code></pre></div></div></div><h4>Responses<
             "type": "boolean",
             "default": false,
             "description": "Sets Maintain balances bill-by-bill. Does not import opening bills."
+          },
+          "alias": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "Optional alias, checked against names and aliases within the selected company."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "credit_details": {
+            "$ref": "#/components/schemas/LedgerCreditDetails"
+          },
+          "mailing_details": {
+            "$ref": "#/components/schemas/LedgerMailingDetails"
+          },
+          "tax_details": {
+            "$ref": "#/components/schemas/LedgerTaxDetails"
+          },
+          "bank_details": {
+            "$ref": "#/components/schemas/LedgerBankDetails"
+          },
+          "opening_balance": {
+            "$ref": "#/components/schemas/LedgerOpeningBalance"
           }
         }
+      },
+      "LedgerCreditDetails": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "default_credit_period_days": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 36500
+          },
+          "check_credit_days_during_voucher_entry": {
+            "type": "boolean"
+          }
+        }
+      },
+      "LedgerMailingDetails": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "address": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "type": "string",
+              "maxLength": 255,
+              "minLength": 1
+            }
+          },
+          "state": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "country": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "pincode": {
+            "type": "string",
+            "maxLength": 20
+          }
+        },
+        "description": "Dated mailing details start at the selected company Books From date. Country/state values remain subject to native Tally validation."
+      },
+      "LedgerTaxDetails": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "pan": {
+            "type": "string",
+            "maxLength": 10,
+            "description": "PAN or empty string; trimmed and uppercased. Syntax is checked, not registration status."
+          },
+          "registration_type": {
+            "type": "string",
+            "enum": [
+              "Regular",
+              "Composition",
+              "Unregistered",
+              "Unregistered/Consumer",
+              "Consumer",
+              "Unknown"
+            ],
+            "description": "Unregistered normalizes to Unregistered/Consumer."
+          },
+          "gstin": {
+            "type": "string",
+            "maxLength": 15,
+            "description": "GSTIN or empty string; trimmed/uppercased. Must contain the supplied PAN when both are supplied."
+          }
+        },
+        "description": "Prime 3+ GST registration entries start at the selected company Books From date."
+      },
+      "LedgerBankDetails": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "account_holder_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1
+          },
+          "bank_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1
+          },
+          "branch": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "account_number": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "description": "String to preserve leading zeros."
+          },
+          "ifsc_code": {
+            "type": "string",
+            "maxLength": 11,
+            "description": "11-character IFSC or empty string; uppercased and syntax checked."
+          }
+        },
+        "nullable": true,
+        "required": [
+          "account_holder_name",
+          "bank_name",
+          "account_number"
+        ],
+        "description": "One default party payment account. Omit or send null for no banking details; not a Bank Accounts ledger or multiple accounts."
+      },
+      "LedgerOpeningBalance": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "amount": {
+            "type": "number",
+            "minimum": 0,
+            "multipleOf": 0.01,
+            "description": "Non-negative amount, up to two decimals and within safe integer cents."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "Dr",
+              "Cr"
+            ]
+          }
+        },
+        "required": [
+          "amount",
+          "type"
+        ],
+        "description": "Original opening at company Books From, not a later selected FY. Dr emits negative XML, Cr positive. Zero has no financial direction. No opening bill references are created."
       },
       "LedgerCreateResponse": {
         "type": "object",
@@ -7346,6 +7647,30 @@ print(response.status_code, result)</code></pre></div></div></div><h4>Responses<
               },
               "guid": {
                 "type": "string"
+              },
+              "alias": {
+                "type": "string",
+                "maxLength": 255,
+                "description": "Optional alias, checked against names and aliases within the selected company."
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 1000
+              },
+              "credit_details": {
+                "$ref": "#/components/schemas/LedgerCreditDetails"
+              },
+              "mailing_details": {
+                "$ref": "#/components/schemas/LedgerMailingDetails"
+              },
+              "tax_details": {
+                "$ref": "#/components/schemas/LedgerTaxDetails"
+              },
+              "bank_details": {
+                "$ref": "#/components/schemas/LedgerBankDetails"
+              },
+              "opening_balance": {
+                "$ref": "#/components/schemas/LedgerOpeningBalance"
               }
             }
           },

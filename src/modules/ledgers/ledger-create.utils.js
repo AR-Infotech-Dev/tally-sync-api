@@ -1,11 +1,6 @@
-export const normalizeLedgerCreate = ledger => ({
-  name: ledger.name.trim(),
-  parent: ledger.parent.trim(),
-  dealer_code: (ledger.dealer_code || "").trim(),
-  bill_wise: ledger.bill_wise === true,
-});
+export { normalizeLedgerFields as normalizeLedgerCreate } from "../../shared/utils/ledgerCreate.contract.js";
 
-export function assertLedgerCreateReplay (existing, input) {
+export function assertLedgerCreateReplay(existing, input) {
   if (input.transaction_type !== "ledger_create" && existing.transaction_type !== "ledger_create")
     return;
   if (
@@ -17,7 +12,6 @@ export function assertLedgerCreateReplay (existing, input) {
   ) {
     throw Object.assign(
       new Error(
-        
         "This idempotency_key was already used for a different request. Use the original payload or a new key.",
       ),
       {
