@@ -4,7 +4,7 @@ import { claimConnectorLedgerImport } from "../connector-jobs/connector-job.mode
 
 export const claimLedgerCreateImport = claimConnectorLedgerImport;
 
-export const queueLedgerCreate = (input) =>
+export const queueLedgerCreate =  (input) =>
   queueConnectorJob({
     client_id: input.client_id,
     transaction_type: "ledger_create",

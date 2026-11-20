@@ -6,8 +6,10 @@ const validText = (value, max, optional = false) =>
   !/[\u0000-\u001f\u007f\ufffe\uffff]/u.test(value) &&
   value.isWellFormed();
 
+
 export function validateLedgerCreate(body = {}) {
-  const errors = [];
+  const errors  = [];
+
   const add = (field, message) => errors.push({ field, message });
   if (!object(body)) return [{ field: "body", message: "Send a JSON object." }];
   for (const field of Object.keys(body))
