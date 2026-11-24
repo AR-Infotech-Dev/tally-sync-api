@@ -16,6 +16,31 @@ const company = (guid, name = "Same name") => ({
   company_number: guid === a ? "100001" : "100002",
   data_path: "D:/Tally/Data",
 });
+
+test("cached company resolution never calls Tally and retains client and explicit ID scope", async () => {
+  const rows = normalizeCompanies("client1", [company(a), company(b)]).map((row, i) => ({
+    ...row,
+    company_id: `0${i + 1}`,
+    status: "closed",
+  }));
+  const registry = createCompanyRegistry({
+    request: async () => assert.fail("Cached reports must not discover open companies"),
+    read: async (client) => (client === "client1" ? rows : []),
+  });
+  const target = await registry.resolve(
+    "client1",
+    { company_id: "02", company: "untrusted name" },
+    { requireLive: false },
+  );
+  assert.equal(target.company_guid, rows[1].company_key);
+  assert.equal(target.tally_guid, b);
+  await assert.rejects(registry.resolve("other", { company_id: "02" }, { requireLive: false }), {
+    code: "COMPANY_NOT_FOUND",
+  });
+  await assert.rejects(registry.resolve("client1", {}, { requireLive: false }), {
+    code: "COMPANY_ID_REQUIRED",
+  });
+});
 test("Voucher lookup requires company_id and preserves query aliases without a company-name fallback", () => {
   assert.deepEqual(
     validateVoucherLookup({ company_id: "01", party_ledger: "Party", voucher_number: "001" })

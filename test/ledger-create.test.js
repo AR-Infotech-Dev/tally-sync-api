@@ -70,6 +70,86 @@ test("idempotency preserves a ledger request and rejects changed company, fields
   );
 });
 
+test("ledger details validate nested fields and normalize without changing basic retry payloads", () => {
+  const body = payload();
+  Object.assign(body.ledger, {
+    alias: " ABC-CUSTOMER ",
+    description: " Customer details ",
+    credit_details: {
+      default_credit_period_days: 30,
+      check_credit_days_during_voucher_entry: true,
+    },
+    mailing_details: {
+      name: "ABC Traders",
+      address: [" Pune "],
+      state: "Maharashtra",
+      country: "India",
+      pincode: "411001",
+    },
+    tax_details: { pan: "abcde1234f", registration_type: "Regular", gstin: "27abcde1234f1z5" },
+    bank_details: {
+      account_holder_name: "ABC Traders",
+      bank_name: "Sample Bank",
+      account_number: "00123456789",
+      ifsc_code: "sbin0001234",
+      branch: "Pune",
+    },
+    opening_balance: { amount: 125.25, type: "Dr" },
+  });
+  assert.deepEqual(validateLedgerCreate(body), []);
+  const normalized = normalizeLedgerCreate(body.ledger);
+  assert.equal(normalized.tax_details.pan, "ABCDE1234F");
+  assert.equal(normalized.tax_details.gstin, "27ABCDE1234F1Z5");
+  assert.equal(normalized.bank_details.account_number, "00123456789");
+  assert.deepEqual(normalized.mailing_details.address, ["Pune"]);
+  const same = { ...body.ledger, opening_balance: { type: "Dr", amount: 125.25 } };
+  assert.deepEqual(normalizeLedgerCreate(same), normalized);
+  for (const [group, key, value] of [
+    ["credit_details", "default_credit_period_days", -1],
+    ["credit_details", "check_credit_days_during_voucher_entry", "yes"],
+    ["mailing_details", "address", ["Good", ""]],
+    ["tax_details", "pan", "YOUR_PAN"],
+    ["tax_details", "gstin", "YOUR_GSTIN"],
+    ["tax_details", "pan", 42],
+    ["bank_details", "ifsc_code", "YOUR_IFSC_CODE"],
+    ["opening_balance", "amount", 1.123],
+    ["opening_balance", "amount", -100],
+    ["opening_balance", "type", "debit"],
+    ["mailing_details", "invented", true],
+  ]) {
+    const bad = structuredClone(body);
+    bad.ledger[group][key] = value;
+    assert.ok(
+      validateLedgerCreate(bad).some((error) => error.field.startsWith(`ledger.${group}.${key}`)),
+    );
+  }
+  for (const value of [null, [], 10, "invalid"]) {
+    const bad = structuredClone(body);
+    bad.ledger.credit_details = value;
+    assert.ok(validateLedgerCreate(bad).some((error) => error.field === "ledger.credit_details"));
+  }
+  assert.deepEqual(
+    validateLedgerCreate({ ...payload(), ledger: { ...payload().ledger, bank_details: null } }),
+    [],
+  );
+  assert.deepEqual(Object.keys(normalizeLedgerCreate(payload().ledger)), [
+    "name",
+    "parent",
+    "dealer_code",
+    "bill_wise",
+  ]);
+  const input = { ...body, transaction_type: "ledger_create", ledger: normalized };
+  const existing = { ...input, request_id: "FULL_1" };
+  assert.throws(
+    () =>
+      assertLedgerCreateReplay(existing, {
+        ...input,
+        ledger: { ...normalized, opening_balance: { amount: 999, type: "Dr" } },
+      }),
+    { status: 409 },
+  );
+});
+
 test("only one Server import claim can be granted and the claim is client-scoped", async () => {
   const row = {
     client_id: "A",

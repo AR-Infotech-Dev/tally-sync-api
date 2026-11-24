@@ -47,10 +47,11 @@ export function createCompanyRegistry({
   }
   return {
     list,
-    resolve: async (clientId, reference) => {
+    resolve: async (clientId, reference, { requireLive = true } = {}) => {
       if (!reference?.company_id)
         throw companyError("COMPANY_ID_REQUIRED", "company_id is required.", 400);
-      return selectCompany(await list(clientId, { requireLive: true }), reference);
+      const rows = requireLive ? await list(clientId, { requireLive: true }) : await read(clientId);
+      return selectCompany(rows, reference, { requireOpen: requireLive });
     },
   };
 }

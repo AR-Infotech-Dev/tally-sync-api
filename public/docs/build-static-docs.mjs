@@ -4,6 +4,8 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const docsDir = dirname(fileURLToPath(import.meta.url));
+// Optional paths let client-specific guides reuse the established documentation renderer.
+const [sourcePath, templatePath, outputPath] = process.argv.slice(2);
 const require = createRequire(import.meta.url);
 let yaml;
 try {
@@ -18,7 +20,9 @@ try {
     "Documentation generation needs js-yaml. Install project dependencies in Connector first. The generated HTML itself has no dependencies.",
   );
 }
-const sourceSpec = yaml.load(await readFile(join(docsDir, "tally-sync-api.openapi.yaml"), "utf8"));
+const sourceSpec = yaml.load(
+  await readFile(sourcePath || join(docsDir, "tally-sync-api.openapi.yaml"), "utf8"),
+);
 const httpMethods = new Set(["get", "post", "put", "patch", "delete", "head", "options", "trace"]);
 
 function includeInPublicDocs(path, operation) {
@@ -35,8 +39,9 @@ const spec = {
   ...sourceSpec,
   info: {
     ...sourceSpec.info,
-    description:
-      "Client API for registration, Sales Orders, Sales Vouchers, Receipts, Purchase Orders, Purchases, Payments, Ledger Creation, ledger statements and PDF downloads. Application authentication uses X-Client-ID plus X-API-Key. Create operations wait for a final result; HTTP 504 returns request_id when the wait expires. Ledger Creation verifies the ledger by read-back and distinguishes conflicts and uncertain outcomes. Pending Sales PDF exports use HTTP 202 polling. Examples use fictional values and require matching Tally masters.",
+    description: sourcePath
+      ? sourceSpec.info.description
+      : "Client API for registration, Sales Orders, Sales Vouchers, Receipts, Purchase Orders, Purchases, Payments, Ledger Creation, ledger statements and PDF downloads. Application authentication uses X-Client-ID plus X-API-Key. Create operations wait for a final result; HTTP 504 returns request_id when the wait expires. Ledger Creation verifies the ledger by read-back and distinguishes conflicts and uncertain outcomes. Pending Sales PDF exports use HTTP 202 polling. Examples use fictional values and require matching Tally masters.",
   },
   paths: Object.fromEntries(
     Object.entries(sourceSpec.paths).flatMap(([path, item]) => {
@@ -376,7 +381,7 @@ const reference = groupNames
   })
   .join("");
 
-let html = await readFile(join(docsDir, "static-docs.template.html"), "utf8");
+let html = await readFile(templatePath || join(docsDir, "static-docs.template.html"), "utf8");
 const replacements = {
   STYLES: await readFile(join(docsDir, "static-docs.css"), "utf8"),
   SCRIPT: await readFile(join(docsDir, "static-docs.js"), "utf8"),
@@ -397,8 +402,9 @@ html = html.replace(
     return replacements[key];
   },
 );
-await mkdir(join(docsDir, "site"), { recursive: true });
-await writeFile(join(docsDir, "site/index.html"), html, "utf8");
+const outputDir = outputPath || join(docsDir, "site");
+await mkdir(outputDir, { recursive: true });
+await writeFile(join(outputDir, "index.html"), html, "utf8");
 console.log(
   `Generated site/index.html: ${operations.length} endpoints, ${groupNames.length} groups, ${Buffer.byteLength(html)} bytes. No runtime dependencies.`,
 );

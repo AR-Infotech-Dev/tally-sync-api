@@ -42,18 +42,19 @@ export function normalizeCompanies(clientId, rows) {
     );
   return companies;
 }
-export function selectCompany(rows, reference = {}) {
+export function selectCompany(rows, reference = {}, { requireOpen = true } = {}) {
   const id = String(reference.company_id || "");
   if (!id) throw companyError("COMPANY_ID_REQUIRED", "company_id is required.", 400);
   const company = rows.find((row) => isCompanySequence(id) && row.company_id === id);
   if (!company)
     throw companyError("COMPANY_NOT_FOUND", "Company ID does not exist for this client.", 404);
-  if (company.status !== "active")
+  if (requireOpen && company.status !== "active")
     throw companyError(
       "COMPANY_NOT_OPEN",
       "The requested company is not open in Tally. Open it and retry.",
     );
   if (
+    requireOpen &&
     rows.filter(
       (row) =>
         row.status === "active" &&

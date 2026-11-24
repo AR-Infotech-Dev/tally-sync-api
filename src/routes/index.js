@@ -13,8 +13,10 @@ import companyRouter from "../modules/companies/company.router.js";
 import outstandingRouter from "../modules/outstanding/outstanding.router.js";
 import movementAnalysisRouter from "../modules/movement-analysis/movement-analysis.router.js";
 import masterDataRouter from "../modules/master-data/master-data.router.js";
+import tallyNotificationRouter from "../modules/tally-notifications/tally-notification.router.js";
 
 const router = express.Router();
+router.use("/tally/notifications", tallyNotificationRouter);
 router.use(masterDataRouter);
 router.use("/ledgers", ledgerRouter);
 router.use("/group-summary", groupSummaryRouter);

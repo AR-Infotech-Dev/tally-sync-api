@@ -16,6 +16,7 @@ import { dispatchPendingSalesVoucherPdfs } from "../sales/sales-pdf.service.js";
 import { normalizeCompanies } from "../companies/company.identity.js";
 import { saveClientCompanies, readClientCompanies } from "../companies/company.model.js";
 import { isCompanySequence } from "../companies/company-sequence.model.js";
+import { dispatchPendingTallyNotifications } from "../tally-notifications/tally-notification.dispatch.js";
 
 async function emitPendingConnectorJobs(clientId, socket) {
   const requests = await findQueuedConnectorJobs(clientId);
@@ -31,6 +32,15 @@ async function emitPendingConnectorJobs(clientId, socket) {
       count: requests.length,
     });
   }
+}
+
+function dispatchTallyNotifications(clientId) {
+  dispatchPendingTallyNotifications(clientId).catch((error) =>
+    recordConsoleLog("error", "Could not dispatch Tally notifications", {
+      client_id: clientId,
+      message: error.message,
+    }),
+  );
 }
 
 const isValidId = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
@@ -154,6 +164,7 @@ export function registerConnectorSocketHandlers(socket) {
     socket.data.registeredAt = new Date().toISOString();
     socket.data.lastSeenAt = socket.data.registeredAt;
     socket.join(connectorRoom(clientId));
+    dispatchTallyNotifications(clientId);
 
     const result = {
       success: true,
@@ -214,6 +225,7 @@ export function registerConnectorSocketHandlers(socket) {
     const result = { success: true, at: socket.data.lastSeenAt };
     ack(result);
     socket.emit(SOCKET_EVENTS.connectorHeartbeatAck, result);
+    dispatchTallyNotifications(socket.data.clientId);
     // Recover queued work if a one-time push signal was missed while this
     // authenticated socket stayed connected.
     emitPendingConnectorJobs(socket.data.clientId, socket).catch((error) => {

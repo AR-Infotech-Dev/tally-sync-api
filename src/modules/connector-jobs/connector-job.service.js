@@ -16,7 +16,9 @@ import {
 export async function queueConnectorJob(input) {
   const type = input.transaction_type || "sales_order";
   const config = getConnectorJobType(type);
-  const company = await resolveRequestCompany(input.client_id, input.destination || input.lookup);
+  const company = await resolveRequestCompany(input.client_id, input.destination || input.lookup, {
+    requireLive: config.requireTally,
+  });
   await assertConnectorAvailable(input.client_id, { requireTally: config.requireTally });
   const result = await createConnectorJob({
     ...input,

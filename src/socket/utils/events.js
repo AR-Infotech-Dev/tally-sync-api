@@ -20,4 +20,5 @@ export const SOCKET_EVENTS = Object.freeze({
   salesOrderUpdate: "sales-order:update",
   voucherUpdated: "voucher.updated",
   tallySync: "tally:sync",
+  tallyNotification: "tally:notification",
 });
