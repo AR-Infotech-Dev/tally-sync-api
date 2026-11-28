@@ -11,6 +11,8 @@ export const SOCKET_EVENTS = Object.freeze({
   salesOrderPush: "sales-order:push",
   salesOrderFetch: "sales-order:fetch",
   ledgerStatementFetch: "ledger-statement:fetch",
+  mfgJournalPush: "mfg-journal:push",
+  mfgJournalPdfExport: "mfg-journal:pdf:export",
   salesVoucherPush: "sales-voucher:push",
   receiptVoucherPush: "receipt-voucher:push",
   purchaseOrderPush: "purchase-order:push",

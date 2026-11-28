@@ -62,12 +62,14 @@ export async function assertConnectorResponsive(clientId) {
       .timeout(timeout)
       .emitWithAck(SOCKET_EVENTS.connectorTallyCheck, { require_tally: false });
   } catch (error) {
-    if (error.responses?.some((response) => response?.success === true)) return;
+    const responsive = error.responses?.find((response) => response?.success === true);
+    if (responsive) return responsive;
     assertConnectorConnected(clientId);
     throw availabilityError("CONNECTOR_NOT_RESPONDING");
   }
   if (!responses.some((response) => response?.success === true))
     throw availabilityError("CONNECTOR_NOT_RESPONDING");
+  return responses.find((response) => response?.success === true);
 }
 
 /** Read-only preflight: never queue new live work while its dependencies are offline. */

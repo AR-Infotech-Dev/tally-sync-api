@@ -1,0 +1,70 @@
+<!doctype html>
+<html
+  ><head
+    ><meta charset="utf-8" /><title>Item Sales Comparison</title>
+    <style>
+      body { font-family: Report-latin, Report-devanagari, sans-serif; color: #111; font-size: 11px; }
+      h1 { font-size: 20px; margin: 0 0 8px; }
+      p { margin: 4px 0; }
+      table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+      thead { display: table-header-group; }
+      tr { break-inside: avoid; }
+      th, td { padding: 7px 6px; border-bottom: 1px solid #ddd; text-align: right; vertical-align: top; overflow-wrap: anywhere; }
+      th { background: #f1f5f9; }
+      th:first-child, td:first-child { text-align: left; }
+      .note { color: #555; font-size: 10px; }
+      .totals { font-weight: bold; }
+      .comparison-section { margin-top: 18px; break-inside: avoid; }
+      h2 { font-size: 14px; margin: 0 0 4px; break-after: avoid; }
+    </style></head
+  ><body>
+    <h1>Item Sales Comparison</h1>
+    <p>Comparison: {{comparison_type_label}}</p>
+    <p>A: <strong>{{company_a}}</strong></p
+    ><p>B: <strong>{{company_b}}</strong></p>
+    <p
+      >{{#if from_date}}{{from_date}} to {{to_date}}{{else}}Company-wise comparison periods{{/if}} ·
+      Sales basis: {{sales_basis}} · Match by: {{match_by}}</p
+    >
+    <p>{{#if item_code}}Item Code: {{item_code}}{{else}}All stock items{{/if}}</p>
+    <p class="note"
+      >Change compares B with A. Increase means higher sales; Decrease means lower sales. Item
+      values exclude separate tax and invoice charges. Quantities use each item's reported unit. No
+      currency or unit conversion.</p
+    >
+    {{#each companies}}<p class="note"
+      >{{company_name}} · {{from_date}} to {{to_date}} · Currency: {{#if
+      currency}}{{currency}}{{else}}unverified{{/if}} · Cache updated: {{cache_updated_at}}</p
+    >{{/each}} {{#each warnings}}<p class="note">{{this}}</p>{{/each}} {{#if is_monthly}}<p
+      class="note"
+      >Selected-period totals — A: {{total_a}} · B: {{total_b}} · {{total_delta}}</p
+    >{{/if}} {{#each sections}}<section class="comparison-section">
+      <h2>{{title}}</h2><p class="note">{{period_label}}</p>
+      {{#if comparison_available}}
+      <table
+        ><thead
+          ><tr
+            ><th>Item / Code</th><th>A quantity</th><th>A value</th><th>B quantity</th
+            ><th>B value</th><th>Quantity change</th><th>Value change</th></tr
+          ></thead
+        >
+        <tbody
+          >{{#each rows}}<tr
+            ><td
+              >{{stock_item}}{{#if item_code}}<br /><span class="note">{{item_code}}</span
+              >{{/if}}{{#if alternate_name}}<br /><span class="note">B: {{alternate_name}}</span
+              >{{/if}}</td
+            ><td>{{quantity_a}} {{unit_a}}</td><td>{{amount_a}}</td
+            ><td>{{quantity_b}} {{unit_b}}</td><td>{{amount_b}}</td><td>{{quantity_delta}}</td
+            ><td>{{amount_delta}}</td></tr
+          >{{else}}<tr><td colspan="7">No stock items to compare.</td></tr
+          >{{/each}}
+          <tr class="totals"
+            ><td>Total value</td><td></td><td>{{total_a}}</td><td></td><td>{{total_b}}</td><td></td
+            ><td>{{total_delta}}</td></tr
+          ></tbody
+        ></table
+      >{{else}}<p class="note">{{message}}</p>{{/if}}</section
+    >{{/each}}
+  </body></html
+>

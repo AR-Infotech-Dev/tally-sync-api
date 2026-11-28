@@ -12,11 +12,20 @@ import {
 } from "../connector-jobs/connector-job.model.js";
 import { findActiveClient } from "../clients/client.model.js";
 import { recordConsoleLog } from "../console/consoleLog.store.js";
+import { dispatchPendingMfgJournalPdfs } from "../mfg_journal/mfg-journal-pdf.service.js";
 import { dispatchPendingSalesVoucherPdfs } from "../sales/sales-pdf.service.js";
 import { normalizeCompanies } from "../companies/company.identity.js";
 import { saveClientCompanies, readClientCompanies } from "../companies/company.model.js";
 import { isCompanySequence } from "../companies/company-sequence.model.js";
 import { dispatchPendingTallyNotifications } from "../tally-notifications/tally-notification.dispatch.js";
+
+async function dispatchPendingVoucherPdfs(clientId, socket) {
+  const counts = await Promise.all([
+    dispatchPendingSalesVoucherPdfs(clientId, socket),
+    dispatchPendingMfgJournalPdfs(clientId, socket),
+  ]);
+  return counts.reduce((total, count) => total + count, 0);
+}
 
 async function emitPendingConnectorJobs(clientId, socket) {
   const requests = await findQueuedConnectorJobs(clientId);
@@ -189,17 +198,17 @@ export function registerConnectorSocketHandlers(socket) {
         connectorId,
       });
     });
-    dispatchPendingSalesVoucherPdfs(clientId, socket)
+    dispatchPendingVoucherPdfs(clientId, socket)
       .then((count) => {
         if (count)
-          recordConsoleLog("info", "Queued Sales Voucher PDF export signals dispatched", {
+          recordConsoleLog("info", "Queued voucher PDF export signals dispatched", {
             source: "socket",
             clientId,
             count,
           });
       })
       .catch((error) =>
-        recordConsoleLog("error", "Could not dispatch queued Sales Voucher PDF exports", {
+        recordConsoleLog("error", "Could not dispatch queued voucher PDF exports", {
           source: "socket",
           clientId,
           message: error.message,
@@ -236,12 +245,12 @@ export function registerConnectorSocketHandlers(socket) {
         connectorId: socket.data.connectorId,
       });
     });
-    dispatchPendingSalesVoucherPdfs(socket.data.clientId, socket)
+    dispatchPendingVoucherPdfs(socket.data.clientId, socket)
       .then((count) => {
         if (count) {
           recordConsoleLog(
             "info",
-            "Queued Sales Voucher PDF export signals redispatched after heartbeat",
+            "Queued voucher PDF export signals redispatched after heartbeat",
             {
               source: "socket",
               clientId: socket.data.clientId,
@@ -252,8 +261,8 @@ export function registerConnectorSocketHandlers(socket) {
         }
       })
       .catch((error) => {
-        console.error("Could not reconcile queued Sales Voucher PDF exports:", error.message);
-        recordConsoleLog("error", "Could not reconcile queued Sales Voucher PDF exports", {
+        console.error("Could not reconcile queued voucher PDF exports:", error.message);
+        recordConsoleLog("error", "Could not reconcile queued voucher PDF exports", {
           source: "socket",
           clientId: socket.data.clientId,
           connectorId: socket.data.connectorId,
@@ -268,6 +277,7 @@ export function registerConnectorSocketHandlers(socket) {
       [
         SOCKET_EVENTS.salesOrderPush,
         SOCKET_EVENTS.salesVoucherPush,
+        SOCKET_EVENTS.mfgJournalPush,
         SOCKET_EVENTS.receiptVoucherPush,
         SOCKET_EVENTS.purchaseOrderPush,
         SOCKET_EVENTS.purchaseVoucherPush,

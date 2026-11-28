@@ -13,6 +13,12 @@ export const connectorJobTypes = Object.freeze({
     action: "ledger.create",
     requireTally: true,
   },
+  mfg_journal: {
+    label: "MFG Journal",
+    event: SOCKET_EVENTS.mfgJournalPush,
+    action: "mfg_journal.push",
+    requireTally: true,
+  },
   sales_order: {
     label: "Sales Order",
     event: SOCKET_EVENTS.salesOrderPush,
@@ -65,12 +71,23 @@ export const connectorJobTypes = Object.freeze({
   master_data: report("Tally master data", true),
   outstanding: report("Outstanding"),
   stock_item_movement: report("Stock Item Movement Analysis", true),
+  item_sales: report("Cached Item Sales"),
 });
 
 export function getConnectorJobType(type = "sales_order") {
   const config = Object.hasOwn(connectorJobTypes, type) ? connectorJobTypes[type] : undefined;
   if (!config) throw new TypeError(`Unsupported Connector job type '${type}'.`);
   return config;
+}
+
+export function connectorJobNeedsTally(request, { syncing = false } = {}) {
+  const type = request.transaction_type || "sales_order";
+  const config = getConnectorJobType(type);
+  if (syncing) return false; // Foreground Connector job performs the live validation.
+  // Ledger lists can use an already verified Connector snapshot while Tally
+  // is occupied by sync. Other master catalogs still require a live export.
+  if (type === "master_data" && request.lookup?.catalog === "ledgers") return false;
+  return config.requireTally;
 }
 
 /** Used for both first delivery and replay after a Connector reconnects. */

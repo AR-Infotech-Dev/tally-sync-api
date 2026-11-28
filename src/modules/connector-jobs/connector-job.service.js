@@ -4,22 +4,31 @@ import {
   getConnectorJob,
   requeueLedgerVerification,
 } from "./connector-job.model.js";
-import { connectorJobSignal, getConnectorJobType } from "./connector-job.registry.js";
+import {
+  connectorJobSignal,
+  getConnectorJobType,
+  connectorJobNeedsTally,
+} from "./connector-job.registry.js";
 import { recordConsoleLog } from "../console/consoleLog.store.js";
 import { resolveRequestCompany } from "../companies/company.service.js";
 import {
   assertConnectorAvailable,
   assertConnectorConnected,
+  assertConnectorResponsive,
   assertNoAvailabilityFailure,
 } from "../connectors/connectorAvailability.service.js";
 
 export async function queueConnectorJob(input) {
   const type = input.transaction_type || "sales_order";
   const config = getConnectorJobType(type);
+  const availability = await assertConnectorResponsive(input.client_id);
+  // A busy Connector must not wait for a second live probe before accepting
+  // work. Native company identity is still checked by the foreground job itself.
+  const requireTally = connectorJobNeedsTally(input, { syncing: availability?.syncing === true });
   const company = await resolveRequestCompany(input.client_id, input.destination || input.lookup, {
-    requireLive: config.requireTally,
+    requireLive: requireTally,
   });
-  await assertConnectorAvailable(input.client_id, { requireTally: config.requireTally });
+  if (requireTally) await assertConnectorAvailable(input.client_id, { requireTally: true });
   const result = await createConnectorJob({
     ...input,
     destination: { ...input.destination, ...company },

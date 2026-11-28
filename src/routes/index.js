@@ -12,10 +12,14 @@ import groupRouter from "../modules/groups/group.router.js";
 import companyRouter from "../modules/companies/company.router.js";
 import outstandingRouter from "../modules/outstanding/outstanding.router.js";
 import movementAnalysisRouter from "../modules/movement-analysis/movement-analysis.router.js";
+import itemSalesComparisonRouter from "../modules/item-sales-comparison/item-sales-comparison.router.js";
 import masterDataRouter from "../modules/master-data/master-data.router.js";
 import tallyNotificationRouter from "../modules/tally-notifications/tally-notification.router.js";
 
+import mfgJournalRouter from "../modules/mfg_journal/mfg-journal.router.js";
+
 const router = express.Router();
+router.use("/mfg-journals", mfgJournalRouter);
 router.use("/tally/notifications", tallyNotificationRouter);
 router.use(masterDataRouter);
 router.use("/ledgers", ledgerRouter);
@@ -24,6 +28,7 @@ router.use("/groups", groupRouter);
 router.use("/companies", companyRouter);
 router.use("/outstanding", outstandingRouter);
 router.use("/movement-analysis", movementAnalysisRouter);
+router.use("/item-sales-comparison", itemSalesComparisonRouter);
 router.use("/sales-orders", salesOrderRouter);
 router.use("/sales", salesRouter);
 router.use("/receipts", receiptRouter);

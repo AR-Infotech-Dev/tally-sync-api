@@ -11,6 +11,7 @@ import {
   connectorJobSignal,
   getConnectorJobType,
   connectorJobTypes,
+  connectorJobNeedsTally,
 } from "../src/modules/connector-jobs/connector-job.registry.js";
 import { SOCKET_EVENTS } from "../src/socket/utils/events.js";
 import { createVoucherHandlers } from "../src/shared/http/voucherHandlers.js";
@@ -150,6 +151,7 @@ test("Report and lookup dispatch preserve cached versus live Tally requirements"
     "master_data",
     "outstanding",
     "stock_item_movement",
+    "item_sales",
   ]) {
     assert.deepEqual(connectorJobSignal({ request_id: "R", transaction_type: type }), {
       event: SOCKET_EVENTS.ledgerStatementFetch,
@@ -165,10 +167,34 @@ test("Report and lookup dispatch preserve cached versus live Tally requirements"
       event: SOCKET_EVENTS.salesOrderFetch,
       payload: { request_id: "R" },
     });
-  assert.equal(Object.keys(connectorJobTypes).length, 15);
+  assert.equal(Object.keys(connectorJobTypes).length, 17);
   assert.equal(getConnectorJobType(), connectorJobTypes.sales_order);
   for (const type of ["unknown", "toString", "__proto__"])
     assert.throws(() => getConnectorJobType(type), /Unsupported/);
+});
+
+test("ledger catalogs skip live-Tally preflight while other catalogs and writes retain it", () => {
+  assert.equal(
+    connectorJobNeedsTally({ transaction_type: "master_data", lookup: { catalog: "ledgers" } }),
+    false,
+  );
+  for (const catalog of [
+    "stock_items",
+    "stock_availability",
+    "godowns",
+    "voucher_types",
+    "unknown",
+  ])
+    assert.equal(
+      connectorJobNeedsTally({ transaction_type: "master_data", lookup: { catalog } }),
+      true,
+    );
+  assert.equal(connectorJobNeedsTally({ transaction_type: "master_data" }), true);
+  assert.equal(connectorJobNeedsTally({ transaction_type: "ledger_statement" }), false);
+  assert.equal(connectorJobNeedsTally({ transaction_type: "ledger_create" }), true);
+  assert.equal(connectorJobNeedsTally({ transaction_type: "sales_order" }), true);
+  for (const type of ["sales_order", "ledger_create", "stock_item_movement", "master_data"])
+    assert.equal(connectorJobNeedsTally({ transaction_type: type }, { syncing: true }), false);
 });
 test("Voucher queue uses authenticated client scope and preserves duplicate response", async () => {
   let queued;

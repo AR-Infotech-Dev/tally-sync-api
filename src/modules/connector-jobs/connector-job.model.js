@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { getMongoCollection } from "../../config/mongo.database.js";
 import { assertLedgerCreateReplay } from "../ledgers/ledger-create.utils.js";
+import { assertMfgJournalReplay } from "../mfg_journal/mfg-journal.contract.js";
 
 const COLLECTION = "sales_order_requests";
 const configuredRetentionDays = Number.parseInt(process.env.REQUEST_RETENTION_DAYS || "90", 10);
@@ -51,6 +52,7 @@ export async function createConnectorJob(input) {
     ...(input.purchase_order ? { purchase_order: input.purchase_order } : {}),
     ...(input.purchase ? { purchase: input.purchase } : {}),
     ...(input.payment ? { payment: input.payment } : {}),
+    ...(input.mfg_journal ? { mfg_journal: input.mfg_journal } : {}),
     status: "queued",
     attempt_count: 0,
     created_at: now,
@@ -69,6 +71,7 @@ export async function createConnectorJob(input) {
     });
     if (!existing) throw error;
     assertLedgerCreateReplay(existing, input);
+    assertMfgJournalReplay(existing, input);
     return { request: existing, duplicate: true };
   }
 }

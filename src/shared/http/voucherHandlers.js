@@ -2,20 +2,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { failureResponse, successResponse } from "../utils/apiResponse.js";
 import { waitForConnectorJobCompletion } from "../../modules/connector-jobs/connector-job.service.js";
 
-export function createVoucherHandlers({
-  label,
-  field,
-  kind,
-  validate,
-  queue,
-  read,
-  validationMessage = `Invalid ${label} request.`,
-  wait = waitForConnectorJobCompletion,
-  missingWaitLabel = label,
-  requestLabel = label,
-  includeFailureResult = false,
-  allowOrderNumber = true,
-}) {
+export function createVoucherHandlers({ label, field, kind, validate, queue, read, validationMessage = `Invalid ${label} request.`, wait = waitForConnectorJobCompletion, missingWaitLabel = label, requestLabel = label, includeFailureResult = false, allowOrderNumber = true, }) {
   const push = asyncHandler(async (req, res) => {
     const errors = validate(req.body);
     if (errors.length)
