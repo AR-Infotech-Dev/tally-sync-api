@@ -57,7 +57,7 @@ export function buildMonthComparisons(reports, input, compare, comparisonError) 
   const decoded = reports.map((report) => {
     if (
       report.comparison_type !== "month-wise" ||
-      report.monthly_data_version !== 1 ||
+      ![1, 2].includes(report.monthly_data_version) ||
       !Array.isArray(report.monthly_data)
     )
       fail("Connector did not return monthly cached sales. Update Connector and retry.");
@@ -68,7 +68,7 @@ export function buildMonthComparisons(reports, input, compare, comparisonError) 
     for (const record of report.monthly_data) {
       if (
         !Array.isArray(record) ||
-        record.length !== 6 ||
+        record.length !== (report.monthly_data_version === 2 ? 8 : 6) ||
         !calendars.has(record[0]) ||
         !Number.isSafeInteger(record[1]) ||
         record[1] < 0 ||
@@ -76,13 +76,22 @@ export function buildMonthComparisons(reports, input, compare, comparisonError) 
         !Number.isFinite(record[2]) ||
         !Number.isSafeInteger(record[3]) ||
         !Number.isFinite(record[4]) ||
-        !Number.isSafeInteger(record[5])
+        !Number.isSafeInteger(record[5]) ||
+        (report.monthly_data_version === 2 &&
+          ((record[6] !== null && (typeof record[6] !== "string" || !record[6].trim())) ||
+            typeof record[7] !== "boolean" ||
+            (!record[7] && (record[2] !== 0 || record[4] !== 0)) ||
+            (report.rows[record[1]].quantity_complete !== false && !record[7])))
       )
         fail("Connector returned invalid monthly sales data. No partial comparison was generated.");
       const [month, index, ...values] = record;
       if (!months.has(month)) months.set(month, new Map());
       if (months.get(month).has(index)) fail("Connector returned duplicate monthly sales rows.");
       const row = Object.fromEntries(keys.map((key, i) => [key, values[i]]));
+      if (report.monthly_data_version === 2) {
+        row.unit = record[6];
+        row.quantity_complete = record[7];
+      }
       months.get(month).set(index, row);
       if (!sums.has(index)) sums.set(index, zero());
       for (const key of keys) sums.get(index)[key] += row[key];
@@ -90,6 +99,7 @@ export function buildMonthComparisons(reports, input, compare, comparisonError) 
     report.rows.forEach((row, index) => {
       const sum = sums.get(index) || zero();
       for (const key of keys) {
+        if (key.endsWith("_quantity") && row.quantity_complete === false) continue;
         const value = row[key];
         const matches = key.endsWith("_cents")
           ? Number.isSafeInteger(sum[key]) && sum[key] === value
@@ -137,9 +147,15 @@ export function buildMonthComparisons(reports, input, compare, comparisonError) 
         from_date: periods[i].from_date,
         to_date: periods[i].to_date,
         period_source: "requested_range",
+        quantity_issue_count: undefined,
+        quantity_issue_samples: undefined,
         rows: report.rows.map((row, rowIndex) => ({
           ...row,
-          ...(decoded[i].months.get(periods[i].month)?.get(rowIndex) || zero()),
+          ...(decoded[i].months.get(periods[i].month)?.get(rowIndex) || {
+            ...zero(),
+            quantity_complete: true,
+            unit: row.quantity_complete === false ? null : row.unit,
+          }),
         })),
       }));
       const monthlyInput = {

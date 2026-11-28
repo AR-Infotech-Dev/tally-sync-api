@@ -92,8 +92,15 @@ function buildSummaryComparison(reports, input) {
       if (
         !identity ||
         !row.stock_item ||
-        (!row.unit && (row.sales_quantity !== 0 || row.return_quantity !== 0)) ||
-        ![row.sales_quantity, row.return_quantity].every(Number.isFinite)
+        (row.quantity_complete !== undefined && typeof row.quantity_complete !== "boolean") ||
+        (row.quantity_complete !== false &&
+          !row.unit &&
+          (row.sales_quantity !== 0 || row.return_quantity !== 0)) ||
+        !(row.quantity_complete === false
+          ? [row.sales_quantity, row.return_quantity].every(
+              (value) => value === null || value === 0,
+            )
+          : [row.sales_quantity, row.return_quantity].every(Number.isFinite))
       )
         throw comparisonError(
           "Item sales contains a missing item identity or invalid quantity.",
@@ -117,17 +124,28 @@ function buildSummaryComparison(reports, input) {
   const metrics = (row) => ({
     stock_item: row?.stock_item || null,
     item_code: row?.item_code || null,
-    unit: row?.unit || null,
+    unit: row?.quantity_complete === false ? null : row?.unit || null,
+    quantity_complete: row?.quantity_complete !== false,
     has_sales: Boolean(
-      row && (row.sales_quantity || row.return_quantity || row.sales_cents || row.return_cents),
+      row &&
+      (row.quantity_complete === false ||
+        row.sales_quantity ||
+        row.return_quantity ||
+        row.sales_cents ||
+        row.return_cents),
     ),
-    sales_quantity: roundQuantity(row?.sales_quantity || 0),
+    sales_quantity:
+      row?.quantity_complete === false ? null : roundQuantity(row?.sales_quantity || 0),
     sales_amount: (row?.sales_cents || 0) / 100,
-    return_quantity: roundQuantity(row?.return_quantity || 0),
+    return_quantity:
+      row?.quantity_complete === false ? null : roundQuantity(row?.return_quantity || 0),
     return_amount: (row?.return_cents || 0) / 100,
-    quantity: roundQuantity(
-      (row?.sales_quantity || 0) - (basis === "net" ? row?.return_quantity || 0 : 0),
-    ),
+    quantity:
+      row?.quantity_complete === false
+        ? null
+        : roundQuantity(
+            (row?.sales_quantity || 0) - (basis === "net" ? row?.return_quantity || 0 : 0),
+          ),
     amount:
       safeCents((row?.sales_cents || 0) - (basis === "net" ? row?.return_cents || 0 : 0)) / 100,
   });
@@ -137,11 +155,13 @@ function buildSummaryComparison(reports, input) {
     const first = metrics(a),
       second = metrics(b);
     const sameUnit =
-      !a ||
-      !b ||
-      key(a.unit) === key(b.unit) ||
-      (!a.unit && a.sales_quantity === 0 && a.return_quantity === 0) ||
-      (!b.unit && b.sales_quantity === 0 && b.return_quantity === 0);
+      first.quantity_complete &&
+      second.quantity_complete &&
+      (!a ||
+        !b ||
+        key(a.unit) === key(b.unit) ||
+        (!a.unit && a.sales_quantity === 0 && a.return_quantity === 0) ||
+        (!b.unit && b.sales_quantity === 0 && b.return_quantity === 0));
     const quantityDifference = sameUnit ? roundQuantity(second.quantity - first.quantity) : null;
     const amountDifference = valueComparable
       ? safeCents(Math.round(second.amount * 100) - Math.round(first.amount * 100)) / 100
@@ -167,7 +187,7 @@ function buildSummaryComparison(reports, input) {
     for (const row of report.rows) {
       sales = safeCents(sales + row.sales_cents);
       returns = safeCents(returns + row.return_cents);
-      if (!row.unit) continue; // An unsold non-quantity item has no unit to total.
+      if (!row.unit || row.quantity_complete === false) continue;
       const unitKey = key(row.unit);
       const previous = quantities.get(unitKey) || { unit: row.unit, quantity: 0 };
       previous.quantity = roundQuantity(previous.quantity + metrics(row).quantity);
@@ -178,7 +198,10 @@ function buildSummaryComparison(reports, input) {
       sales_amount: sales / 100,
       return_amount: returns / 100,
       amount: safeCents(sales - (basis === "net" ? returns : 0)) / 100,
-      quantities: [...quantities.values()],
+      quantity_complete: report.rows.every((row) => row.quantity_complete !== false),
+      quantities: report.rows.every((row) => row.quantity_complete !== false)
+        ? [...quantities.values()]
+        : [],
     };
   });
   const warnings = [];
@@ -186,9 +209,20 @@ function buildSummaryComparison(reports, input) {
     warnings.push(
       "Amounts are shown in each company's base currency. Amount differences are unavailable because a common currency could not be verified; no currency conversion is performed.",
     );
-  if (rows.some((row) => !row.quantity_comparable))
+  if (
+    rows.some(
+      (row) =>
+        row.company_a.quantity_complete &&
+        row.company_b.quantity_complete &&
+        !row.quantity_comparable,
+    )
+  )
     warnings.push(
       "Some matching items use different quantity units. Their quantity differences are unavailable; units are not converted automatically.",
+    );
+  if (rows.some((row) => !row.company_a.quantity_complete || !row.company_b.quantity_complete))
+    warnings.push(
+      "Some item quantities are unavailable because saved quantities or their units could not be combined safely. All item values remain included; unavailable quantities are not treated as zero.",
     );
   return {
     from_date:
@@ -222,6 +256,12 @@ function buildSummaryComparison(reports, input) {
       cache_updated_at: report.cache_updated_at,
       read_started_at: report.read_started_at,
       read_completed_at: report.read_completed_at,
+      ...(report.quantity_issue_count !== undefined
+        ? {
+            quantity_issue_count: report.quantity_issue_count,
+            quantity_issue_samples: report.quantity_issue_samples || [],
+          }
+        : {}),
     })),
     rows,
     totals,
