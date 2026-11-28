@@ -22,10 +22,15 @@ const safeCents = (value) => {
   return value;
 };
 
+export const comparisonMatchBy = (input) =>
+  input.match_by || (input.stock_item !== undefined ? "stock_item" : "item_code");
+
 function buildSummaryComparison(reports, input) {
-  const matchBy = input.match_by || "item_code";
+  const matchBy = comparisonMatchBy(input);
   const basis = input.sales_basis || "gross";
   const selectedCode = key(input.item_code);
+  const selectedName = key(input.stock_item);
+  const selected = Boolean(selectedCode || selectedName);
   const periods = comparisonPeriods(input);
   reports = reports.map((report) => {
     if (key(report.item_code) !== selectedCode)
@@ -33,11 +38,20 @@ function buildSummaryComparison(reports, input) {
         "Connector did not confirm the requested Item Code filter. Update Connector and retry.",
         502,
       );
+    if (key(report.stock_item) !== selectedName)
+      throw comparisonError(
+        "Connector did not confirm the requested Stock Item Name filter. Update Connector and retry.",
+        502,
+      );
     return {
       ...report,
       rows:
-        selectedCode && Array.isArray(report.rows)
-          ? report.rows.filter((row) => key(row.item_code) === selectedCode)
+        selected && Array.isArray(report.rows)
+          ? report.rows.filter((row) =>
+              selectedCode
+                ? key(row.item_code) === selectedCode
+                : key(row.stock_item) === selectedName,
+            )
           : report.rows,
     };
   });
@@ -51,7 +65,7 @@ function buildSummaryComparison(reports, input) {
     if (
       !report.verified ||
       report.source !== "local_cache" ||
-      (!selectedCode && report.catalog_complete !== true) ||
+      (!selected && report.catalog_complete !== true) ||
       !Array.isArray(report.rows) ||
       !isIsoDate(report.synced_from_date, { bounded: true }) ||
       !isIsoDate(report.synced_to_date, { bounded: true }) ||
@@ -95,9 +109,9 @@ function buildSummaryComparison(reports, input) {
     }
     return rows;
   });
-  if (selectedCode && maps.every((rows) => rows.size === 0))
+  if (selected && maps.every((rows) => rows.size === 0))
     throw comparisonError(
-      `Item Code '${input.item_code.trim()}' was not found in either company.`,
+      `${selectedCode ? "Item Code" : "Stock Item Name"} '${(input.item_code ?? input.stock_item).trim()}' was not found in either company.`,
       404,
     );
   const metrics = (row) => ({
@@ -191,6 +205,7 @@ function buildSummaryComparison(reports, input) {
         : "synced_periods",
     match_by: matchBy,
     item_code: input.item_code?.trim() || null,
+    stock_item: input.stock_item?.trim() || null,
     sales_basis: basis,
     difference_direction: "company_b_minus_company_a",
     amount_basis: "inventory_line_value_excluding_separate_tax_and_invoice_charges",

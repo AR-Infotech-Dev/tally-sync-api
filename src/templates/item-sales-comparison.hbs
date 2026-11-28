@@ -26,7 +26,10 @@
       >{{#if from_date}}{{from_date}} to {{to_date}}{{else}}Company-wise comparison periods{{/if}} ·
       Sales basis: {{sales_basis}} · Match by: {{match_by}}</p
     >
-    <p>{{#if item_code}}Item Code: {{item_code}}{{else}}All stock items{{/if}}</p>
+    <p
+      >{{#if item_code}}Item Code: {{item_code}}{{else}}{{#if stock_item}}Stock Item Name:
+      {{stock_item}}{{else}}All stock items{{/if}}{{/if}}</p
+    >
     <p class="note"
       >Change compares B with A. Increase means higher sales; Decrease means lower sales. Item
       values exclude separate tax and invoice charges. Quantities use each item's reported unit. No

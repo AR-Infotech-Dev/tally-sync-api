@@ -15,9 +15,25 @@ POST `/api/v1/item-sales-comparison` returns JSON. POST `/api/v1/item-sales-comp
 Date fields are optional. When omitted, each company uses its own complete snapshot period. For example, company 02 can supply 2025-04-01 through 2026-03-31, and its split successor 03 can supply 2026-04-01 through 2027-03-31. The API does not infer a year from a company name, extend cache coverage or apply today's FY to an older cache. Verify the saved dates in Saved Data. Previously published periods remain readable during refresh; staged/incomplete records are excluded.
 
 - Exactly two distinct public company IDs are required, authorized against the authenticated client before report work. A/B order follows company_ids; differences are B minus A. Private company keys isolate split copies even when native company/item GUIDs are copied. No IDs are reassigned.
-- Optional item_code selects the primary Part No. separately in each company's published stock masters. Omit it for all saved stock items, including zero-sales rows. Empty/null/non-string codes are invalid. If absent in one company that side is zero; absent in both returns 404. Filtered totals cover only the selected item.
-- match_by defaults to item_code. Use stock_item to align by name, including catalogs without codes. Normalized/trimmed case-insensitive identities are used; no automatic name fallback, unit conversion or ambiguous-code merge is performed. Unique codes are required in code mode.
+- Optional item_code selects the primary Part No. separately in each company's published stock masters. Alternatively, stock_item selects a Stock Item Name. Omit both for all saved stock items, including zero-sales rows. Empty/null/non-string selectors are invalid; sending both returns field validation errors. If absent in one company that side is zero; absent in both returns 404. Filtered totals cover only the selected item.
+- match_by defaults to item_code, or to stock_item when a stock_item selector is supplied. Explicit stock_item matching also works for all items, including catalogs without codes. Normalized/trimmed case-insensitive identities are used; no automatic name fallback, unit conversion or ambiguous-code merge is performed. Unique codes are required in code mode.
 - sales_basis defaults to gross: Sales and custom types derived from Sales only. Purchases, orders, cancelled/optional rows, opening balances and stock carry-forward are excluded. Explicit net mode deducts cached inventory Credit Note returns. These are item-line values, excluding separate tax, charges and invoice round-off; not invoice grand totals.
+
+## Select by Stock Item Name
+
+Both JSON and PDF accept the same optional `stock_item` selector, with either comparison type:
+
+```json
+{
+  "company_ids": ["02", "03"],
+  "comparison_type": "year-wise",
+  "stock_item": "ALGAS 500ML - 24NOS",
+  "match_by": "stock_item",
+  "sales_basis": "gross"
+}
+```
+
+Use `month-wise` for monthly rows. `match_by` can be omitted for this payload: the name selector defaults to name matching. Names match the entire saved Stock Item Name after Unicode normalization, trimming and case normalization; this is not substring search and does not match aliases. Normalized duplicate names in a company return a conflict rather than combining items. Each company's own saved catalog and vouchers are used; a code is not required in name-matching mode. `data.stock_item` echoes the selected name, and PDF labels it explicitly. Omit both selectors to restore the all-items report. The updated Server and Connector are both required; a Connector that does not acknowledge the name filter is rejected, avoiding an incorrect all-items result. No database migration or extra sync is needed for an already compatible complete cache.
 
 ## Independent subperiods
 
@@ -51,13 +67,13 @@ Common top-level from_date/to_date remain supported for callers comparing the sa
 }
 ```
 
-Omit `item_code` to compare all stock items. Optional `company_periods` work with either type. No extra sync is needed for monthly grouping when the existing cache already supports the comparison. Connector scans the saved vouchers once and returns compact, sparse monthly totals; the Server fills zero-sales rows only inside covered months. A month outside either company's selected period has `comparison_available: false`, empty `rows`/`totals`, null difference and an explanatory message. It is never treated as zero sales. Partial-month dates and a warning are shown. Overall totals still reflect each full selected period. PDF uses the same monthly sections; JSON's existing `data.rows`/`data.totals` remain the overall summary. An older Connector that cannot return monthly data is rejected explicitly.
+Omit both selectors to compare all stock items. Optional `company_periods` work with either type. No extra sync is needed for monthly grouping when the existing cache already supports the comparison. Connector scans the saved vouchers once and returns compact, sparse monthly totals; the Server fills zero-sales rows only inside covered months. A month outside either company's selected period has `comparison_available: false`, empty `rows`/`totals`, null difference and an explanatory message. It is never treated as zero sales. Partial-month dates and a warning are shown. Overall totals still reflect each full selected period. PDF uses the same monthly sections; JSON's existing `data.rows`/`data.totals` remain the overall summary. An older Connector that cannot return monthly data is rejected explicitly.
 
 ## JSON and PDF
 
 PDF change columns show positive magnitudes with Increase / Decrease labels, or No change for zero, so a decrease is explained without a minus figure. The existing JSON difference fields retain signed B-minus-A numbers for calculation compatibility. Incomparable values still display an em dash in the PDF.
 
-The standard success envelope contains data.companies, data.rows, data.totals, total_items, warnings, request_ids, item_code and period_mode. Every company includes its comparison dates, saved dates, source=local_cache, last_synced_at and cache_updated_at. Top-level dates are null when the two periods differ; the per-company dates remain explicit. JSON and PDF show separate company values and B−A differences. Items with no activity remain zero; has_sales is false. Zero-base percentages are null. Quantities are grouped by unit; incompatible units have null differences. Missing/different cached currencies produce null amount differences with a warning, while each company's amounts remain visible. No currency is guessed or converted. Units for an unsold legacy master may be unavailable; no unit is invented.
+The standard success envelope contains data.companies, data.rows, data.totals, total_items, warnings, request_ids, item_code, stock_item and period_mode. Every company includes its comparison dates, saved dates, source=local_cache, last_synced_at and cache_updated_at. Top-level dates are null when the two periods differ; the per-company dates remain explicit. JSON and PDF show separate company values and B−A differences. Items with no activity remain zero; has_sales is false. Zero-base percentages are null. Quantities are grouped by unit; incompatible units have null differences. Missing/different cached currencies produce null amount differences with a warning, while each company's amounts remain visible. No currency is guessed or converted. Units for an unsold legacy master may be unavailable; no unit is invented.
 
 The results reflect the last saved cache, not unsynced Tally edits. Two sequential company reads are not a cross-company atomic snapshot; each cache timestamp is shown. Connector must remain online because SQLite is local, even though Tally can be closed. Scoping remains Server URL + Client ID + configured Tally URL; caches from other clients or unknown port scopes are never combined.
 

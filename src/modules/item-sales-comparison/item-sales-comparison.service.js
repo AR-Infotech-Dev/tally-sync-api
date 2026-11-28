@@ -1,6 +1,10 @@
 import { requestConnectorReport } from "../connector-jobs/connector-job.service.js";
 import { resolveRequestCompany } from "../companies/company.service.js";
-import { buildItemSalesComparison, comparisonError } from "./item-sales-comparison.utils.js";
+import {
+  buildItemSalesComparison,
+  comparisonError,
+  comparisonMatchBy,
+} from "./item-sales-comparison.utils.js";
 import { comparisonPeriods } from "./item-sales-comparison.periods.js";
 
 export function createItemSalesComparisonRequester({
@@ -22,10 +26,11 @@ export function createItemSalesComparisonRequester({
       const lookup = {
         company_id: target.company_id,
         ...periods.find((period) => period.company_id === target.company_id),
-        match_by: input.match_by || "item_code",
+        match_by: comparisonMatchBy(input),
         sales_basis: input.sales_basis || "gross",
         comparison_type: input.comparison_type || "year-wise",
         ...(input.item_code !== undefined ? { item_code: input.item_code.trim() } : {}),
+        ...(input.stock_item !== undefined ? { stock_item: input.stock_item.trim() } : {}),
       };
       const result = await requestReport(clientId, lookup, "item_sales", shouldStop, {
         timeoutEnv: "ITEM_SALES_RESPONSE_TIMEOUT_MS",

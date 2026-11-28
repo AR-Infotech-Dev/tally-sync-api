@@ -1,7 +1,7 @@
 import { validateReportDates } from "../../shared/utils/dateValidation.js";
 import { isCompanySequence } from "../companies/company-sequence.model.js";
 
-export function validateItemSalesComparison(body) {
+export function validateItemSalesComparison (body) {
   if (!body || typeof body !== "object" || Array.isArray(body))
     return [{ field: "body", message: "A JSON object is required." }];
   const errors = [];
@@ -48,7 +48,7 @@ export function validateItemSalesComparison(body) {
           typeof period.company_id !== "string" ||
           !Array.isArray(body.company_ids) ||
           !body.company_ids.some(
-            (id) => typeof id === "string" && id.trim() === period.company_id.trim(),
+            id => typeof id === "string" && id.trim() === period.company_id.trim(),
           )
         )
           errors.push({
@@ -57,7 +57,7 @@ export function validateItemSalesComparison(body) {
           });
         else ids.push(period.company_id.trim());
         errors.push(
-          ...validateReportDates(period).map((error) => ({
+          ...validateReportDates(period).map(error => ({
             ...error,
             field: prefix + "." + error.field,
           })),
@@ -87,18 +87,21 @@ export function validateItemSalesComparison(body) {
     !["year-wise", "month-wise"].includes(body.comparison_type)
   )
     errors.push({ field: "comparison_type", message: "Use year-wise or month-wise." });
-  if (
-    body.item_code !== undefined &&
-    (typeof body.item_code !== "string" ||
-      !body.item_code.trim() ||
-      body.item_code.length > 500 ||
-      /[\x00-\x1f]/.test(body.item_code))
-  )
-    errors.push({
-      field: "item_code",
-      message:
-        "Use a non-empty Item Code up to 500 characters, or omit item_code for all stock items.",
-    });
+  for (const field of ["item_code", "stock_item"])
+    if (
+      body[field] !== undefined &&
+      (typeof body[field] !== "string" ||
+        !body[field].trim() ||
+        body[field].length > 500 ||
+        /[\x00-\x1f]/.test(body[field]))
+    )
+      errors.push({
+        field,
+        message: `Use a non-empty ${field === "item_code" ? "Item Code" : "Stock Item Name"} up to 500 characters, or omit the selector for all stock items.`,
+      });
+  if (body.item_code !== undefined && body.stock_item !== undefined)
+    for (const field of ["item_code", "stock_item"])
+      errors.push({ field, message: "Use item_code or stock_item, not both." });
   const allowed = new Set([
     "company_ids",
     "from_date",
@@ -106,6 +109,7 @@ export function validateItemSalesComparison(body) {
     "match_by",
     "sales_basis",
     "item_code",
+    "stock_item",
     "company_periods",
     "comparison_type",
   ]);
