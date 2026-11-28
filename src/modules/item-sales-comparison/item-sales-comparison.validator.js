@@ -97,7 +97,9 @@ export function validateItemSalesComparison (body) {
     )
       errors.push({
         field,
-        message: `Use a non-empty ${field === "item_code" ? "Item Code" : "Stock Item Name"} up to 500 characters, or omit the selector for all stock items.`,
+        message: `Use a non-empty ${
+          field === "item_code" ? "Item Code" : "Stock Item Name"
+        } up to 500 characters, or omit the selector for all stock items.`,
       });
   if (body.item_code !== undefined && body.stock_item !== undefined)
     for (const field of ["item_code", "stock_item"])
